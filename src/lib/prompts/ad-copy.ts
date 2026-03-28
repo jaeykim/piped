@@ -1,6 +1,7 @@
 import type { SiteAnalysis } from "@/types/analysis";
 
-export function buildAdCopyPrompt(analysis: SiteAnalysis) {
+export function buildAdCopyPrompt(analysis: SiteAnalysis, language?: string) {
+  const langRule = language ? `\nWrite ALL ad copy in ${language}.` : "";
   return {
     systemPrompt:
       "You are a performance marketing expert who writes high-converting ad copy. Return ONLY valid JSON.",
@@ -32,6 +33,6 @@ Generate ads for each platform as JSON:
   ]
 }
 
-Generate 3 variations for Meta and 3 for Google. Each variation should use a different angle (benefit, feature, social proof, urgency).`,
+Generate 3 variations for Meta and 3 for Google. Each variation should use a different angle (benefit, feature, social proof, urgency).${langRule}`,
   };
 }

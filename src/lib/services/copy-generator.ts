@@ -35,23 +35,24 @@ function parseJson(text: string): unknown {
 }
 
 export async function generateAllCopy(
-  analysis: SiteAnalysis
+  analysis: SiteAnalysis,
+  language?: string
 ): Promise<GeneratedCopy[]> {
   const results: GeneratedCopy[] = [];
 
   // Run all prompts in parallel
   const [headlineRes, descRes, adRes, socialRes] = await Promise.all([
     callClaude(
-      ...Object.values(buildHeadlinePrompt(analysis)) as [string, string]
+      ...Object.values(buildHeadlinePrompt(analysis, language)) as [string, string]
     ),
     callClaude(
-      ...Object.values(buildDescriptionPrompt(analysis)) as [string, string]
+      ...Object.values(buildDescriptionPrompt(analysis, language)) as [string, string]
     ),
     callClaude(
-      ...Object.values(buildAdCopyPrompt(analysis)) as [string, string]
+      ...Object.values(buildAdCopyPrompt(analysis, language)) as [string, string]
     ),
     callClaude(
-      ...Object.values(buildSocialPrompt(analysis)) as [string, string]
+      ...Object.values(buildSocialPrompt(analysis, language)) as [string, string]
     ),
   ]);
 
@@ -111,4 +112,47 @@ export async function generateAllCopy(
   );
 
   return results;
+}
+
+export interface CopyTrio {
+  headline: string;
+  subheadline: string;
+  cta: string;
+}
+
+export async function selectCopyTrio(
+  variants: { type: string; content: string }[],
+  concept: string,
+  language?: string
+): Promise<CopyTrio> {
+  const headlines = variants.filter((v) => v.type === "headline").map((v) => v.content);
+  const descriptions = variants.filter((v) => ["description_short", "description_long"].includes(v.type)).map((v) => v.content);
+  const ctas = variants.filter((v) => v.type === "cta").map((v) => v.content);
+
+  // If we have enough variants, let Claude pick the best combo
+  if (headlines.length > 0 && descriptions.length > 0) {
+    try {
+      const res = await callClaude(
+        "You are an ad copy expert. Pick the best headline + subheadline + CTA combination for the given ad concept. Return ONLY valid JSON.",
+        `Pick the best combination for a "${concept}" ad concept${language ? ` in ${language}` : ""}.
+
+Available headlines: ${JSON.stringify(headlines)}
+Available descriptions: ${JSON.stringify(descriptions)}
+Available CTAs: ${JSON.stringify(ctas)}
+
+Return JSON: {"headline": "...", "subheadline": "...", "cta": "..."}
+Pick the combination that creates the strongest emotional hook for "${concept}".`
+      );
+      const match = res.match(/\{[\s\S]*\}/);
+      if (match) return JSON.parse(match[0]) as CopyTrio;
+    } catch {
+      // fallback below
+    }
+  }
+
+  return {
+    headline: headlines[0] || "Get Started Today",
+    subheadline: descriptions[0] || "",
+    cta: ctas[0] || "Try Free",
+  };
 }

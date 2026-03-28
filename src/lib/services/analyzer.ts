@@ -58,6 +58,7 @@ export async function analyzeWebsite(
     tone: result.tone,
     industry: result.industry,
     brandColors: result.brandColors.length > 0 ? result.brandColors : crawl.colors.slice(0, 3),
+    logoUrl: crawl.logoUrl,
     screenshots: crawl.ogImage ? [crawl.ogImage] : [],
     analyzedAt: new Date(),
   };

@@ -1,6 +1,7 @@
 import type { SiteAnalysis } from "@/types/analysis";
 
-export function buildSocialPrompt(analysis: SiteAnalysis) {
+export function buildSocialPrompt(analysis: SiteAnalysis, language?: string) {
+  const langRule = language ? `\n- Write ALL posts in ${language}` : "";
   return {
     systemPrompt:
       "You are a social media strategist who creates viral, engaging posts. Return ONLY a JSON array of strings.",
@@ -19,6 +20,6 @@ Requirements:
 - Each post should be under 280 characters (Twitter-friendly)
 - Include a mix: launch announcement, feature highlight, testimonial-style, question/engagement
 - Match the brand tone
-- Don't include hashtags in the copy itself`,
+- Don't include hashtags in the copy itself${langRule}`,
   };
 }

@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
-import {
-  generateImage,
-  getDefaultImageRequests,
-} from "@/lib/services/image-generator";
+import { generateImage } from "@/lib/services/image-generator";
+import type { ImageRequest } from "@/lib/services/image-generator";
 import { FieldValue } from "firebase-admin/firestore";
 import type { SiteAnalysis } from "@/types/analysis";
 
@@ -19,7 +17,7 @@ export async function POST(request: NextRequest) {
     const decoded = await adminAuth.verifyIdToken(token);
     const uid = decoded.uid;
 
-    const { projectId } = await request.json();
+    const { projectId, requests: customRequests } = await request.json();
     if (!projectId) {
       return NextResponse.json(
         { error: "projectId is required" },
@@ -45,7 +43,11 @@ export async function POST(request: NextRequest) {
     }
 
     const analysis = analysisSnap.data() as SiteAnalysis;
-    const requests = getDefaultImageRequests();
+    const websiteUrl = projectSnap.data()?.url;
+    const requests: ImageRequest[] = (customRequests || [
+      { size: "1080x1080", platform: "instagram", concept: "product-hero" },
+      { size: "1200x628", platform: "facebook", concept: "urgency" },
+    ]).map((r: ImageRequest) => ({ ...r, websiteUrl }));
 
     // Delete existing creatives first
     const existingCreatives = await adminDb
@@ -61,6 +63,8 @@ export async function POST(request: NextRequest) {
       prompt: string;
       size: string;
       platform: string;
+      concept: string;
+      overlayText: string;
       status: "ready" | "failed";
     }[] = [];
 
@@ -72,6 +76,8 @@ export async function POST(request: NextRequest) {
           prompt: result.prompt,
           size: req.size,
           platform: req.platform,
+          concept: req.concept,
+          overlayText: req.overlayText || "",
           status: "ready",
         });
       } catch (error) {
@@ -81,6 +87,8 @@ export async function POST(request: NextRequest) {
           prompt: "",
           size: req.size,
           platform: req.platform,
+          concept: req.concept,
+          overlayText: req.overlayText || "",
           status: "failed",
         });
       }
@@ -101,6 +109,8 @@ export async function POST(request: NextRequest) {
         prompt: c.prompt,
         size: c.size,
         platform: c.platform,
+        concept: c.concept,
+        overlayText: c.overlayText,
         status: c.status,
         createdAt: FieldValue.serverTimestamp(),
       });

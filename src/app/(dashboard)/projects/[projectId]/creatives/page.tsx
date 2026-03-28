@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
-import { getAuth_ } from "@/lib/firebase/client";
+import { collection, getDocs, doc, getDoc, query, orderBy } from "firebase/firestore";
+import { getDb, getAuth_ } from "@/lib/firebase/client";
+import { useAuth } from "@/context/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,41 +14,212 @@ import Link from "next/link";
 import {
   Image,
   Sparkles,
-  Download,
   RefreshCw,
   ArrowRight,
+  ArrowLeft,
   Megaphone,
   CheckCircle,
+  Type,
+  Zap,
+  Star,
+  Clock,
+  Heart,
+  Target,
+  X,
+  Edit3,
+  Package,
+  Video,
 } from "lucide-react";
+import {
+  CREATIVE_CONCEPTS,
+  CREATIVE_SUBJECTS,
+  type CreativeConcept,
+  type CreativeSubject,
+} from "@/types/creative";
+import type { CopyVariant } from "@/types/copy";
+import { CreativeEditor, type CreativeEditorData } from "@/components/creative-editor";
+import { CreativePreview } from "@/components/creative-preview";
+
+const LANGUAGES = [
+  { code: "ko", label: "한국어", flag: "🇰🇷" },
+  { code: "en", label: "English", flag: "🇺🇸" },
+  { code: "ja", label: "日本語", flag: "🇯🇵" },
+  { code: "zh", label: "中文", flag: "🇨🇳" },
+  { code: "es", label: "Español", flag: "🇪🇸" },
+  { code: "fr", label: "Français", flag: "🇫🇷" },
+  { code: "de", label: "Deutsch", flag: "🇩🇪" },
+  { code: "pt", label: "Português", flag: "🇧🇷" },
+  { code: "vi", label: "Tiếng Việt", flag: "🇻🇳" },
+  { code: "th", label: "ไทย", flag: "🇹🇭" },
+];
+
+const COUNTRIES = [
+  { code: "KR", label: "대한민국", flag: "🇰🇷" },
+  { code: "US", label: "미국", flag: "🇺🇸" },
+  { code: "JP", label: "일본", flag: "🇯🇵" },
+  { code: "CN", label: "중국", flag: "🇨🇳" },
+  { code: "GB", label: "영국", flag: "🇬🇧" },
+  { code: "DE", label: "독일", flag: "🇩🇪" },
+  { code: "FR", label: "프랑스", flag: "🇫🇷" },
+  { code: "BR", label: "브라질", flag: "🇧🇷" },
+  { code: "IN", label: "인도", flag: "🇮🇳" },
+  { code: "VN", label: "베트남", flag: "🇻🇳" },
+  { code: "TH", label: "태국", flag: "🇹🇭" },
+  { code: "GLOBAL", label: "글로벌 (전체)", flag: "🌏" },
+];
+
+interface DerivedFormat {
+  size: string;
+  label: string;
+  platform: string;
+  baseImage: string;
+}
 
 interface GeneratedCreative {
   id: string;
-  blobUrl: string;
+  baseImage: string;
+  hookText: string;
+  subheadline: string;
+  cta: string;
+  productName: string;
+  brandColor: string;
+  isComplete: boolean; // true = graphic card with text baked in, no overlay needed
   size: string;
   platform: string;
+  concept: CreativeConcept;
+  formats: DerivedFormat[];
 }
 
-const REQUESTS = [
-  { size: "1080x1080", platform: "instagram", style: "minimal", label: "Instagram (1080x1080)", styleLabel: "Minimal" },
-  { size: "1200x628", platform: "facebook", style: "bold", label: "Facebook (1200x628)", styleLabel: "Bold" },
-];
-
-const platformLabels: Record<string, string> = {
-  instagram: "Instagram",
-  facebook: "Facebook",
+const CONCEPT_ICONS: Record<CreativeConcept, typeof Zap> = {
+  "benefit-driven": Zap,
+  "pain-point": Target,
+  "social-proof": Star,
+  offer: Clock,
+  "how-it-works": ArrowRight,
 };
+
+type OutputType = "image" | "video";
+type Step = "output-type" | "copy" | "concept" | "generate";
 
 export default function CreativesPage() {
   const params = useParams();
   const projectId = params.projectId as string;
-  const [creatives, setCreatives] = useState<GeneratedCreative[]>([]);
-  const [generating, setGenerating] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(-1);
   const { toast } = useToast();
+  const { refreshProfile } = useAuth();
+
+  // Recommendation state
+  interface Recommendation { concept: CreativeConcept; subject: CreativeSubject; reason: string }
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [loadingRecs, setLoadingRecs] = useState(false);
+
+  // Wizard state
+  const [step, setStep] = useState<Step>("output-type");
+  const [outputType, setOutputType] = useState<OutputType>("image");
+  const [selectedLanguage, setSelectedLanguage] = useState("ko");
+  const [selectedCountry, setSelectedCountry] = useState("KR");
+  const [selectedConcept, setSelectedConcept] = useState<CreativeConcept | null>(null);
+  const [selectedSubject, setSelectedSubject] = useState<CreativeSubject>("graphic-card");
+  const [selectedCopy, setSelectedCopy] = useState<string>("");
+  const [copyVariants, setCopyVariants] = useState<CopyVariant[]>([]);
+  const [loadingCopy, setLoadingCopy] = useState(false);
+
+  // Generation state
+  const [creative, setCreative] = useState<GeneratedCreative | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [editingCreative, setEditingCreative] = useState<CreativeEditorData | null>(null);
+  const [generatingVideo, setGeneratingVideo] = useState(false);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+
+  // Load project settings (language/country from copy step)
+  useEffect(() => {
+    async function loadProjectSettings() {
+      const snap = await getDoc(doc(getDb(), "projects", projectId));
+      const data = snap.data();
+      if (data?.language) {
+        const match = LANGUAGES.find((l) => l.label === data.language);
+        if (match) setSelectedLanguage(match.code);
+      }
+      if (data?.country) {
+        const match = COUNTRIES.find((c) => c.label === data.country);
+        if (match) setSelectedCountry(match.code);
+      }
+    }
+    loadProjectSettings();
+
+    // Fetch AI recommendations
+    async function loadRecommendations() {
+      setLoadingRecs(true);
+      try {
+        const token = await getAuth_().currentUser?.getIdToken();
+        if (!token) return;
+        const res = await fetch("/api/creatives/recommend", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ projectId, language: selectedLanguage }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.recommendations?.length) {
+            setRecommendations(data.recommendations);
+            // Auto-select the top recommendation
+            setSelectedConcept(data.recommendations[0].concept);
+            setSelectedSubject(data.recommendations[0].subject);
+          }
+        }
+      } catch (e) { console.error("Recommendations failed:", e); }
+      setLoadingRecs(false);
+    }
+    loadRecommendations();
+  }, [projectId]);
+
+  const loadCopyVariants = useCallback(async () => {
+    setLoadingCopy(true);
+    try {
+      const q = query(
+        collection(getDb(), "projects", projectId, "copyVariants"),
+        orderBy("createdAt", "desc")
+      );
+      const snap = await getDocs(q);
+      const variants = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as CopyVariant);
+      setCopyVariants(variants);
+      // Auto-select the first headline as default overlay text
+      if (!selectedCopy) {
+        const firstHeadline = variants.find((v) => v.type === "headline");
+        if (firstHeadline) {
+          const content = firstHeadline.isEdited && firstHeadline.editedContent
+            ? firstHeadline.editedContent
+            : firstHeadline.content;
+          setSelectedCopy(content);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load copy variants:", error);
+    }
+    setLoadingCopy(false);
+  }, [projectId]);
+
+  useEffect(() => {
+    loadCopyVariants();
+  }, [loadCopyVariants]);
+
+  const startTimer = () => {
+    setElapsed(0);
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => setElapsed((s) => s + 1), 1000);
+  };
+
+  const stopTimer = () => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+  };
 
   const handleGenerate = async () => {
+    if (!selectedConcept) return;
     setGenerating(true);
-    setCreatives([]);
+    setCreative(null);
+    startTimer();
+
     const token = await getAuth_().currentUser?.getIdToken();
     if (!token) {
       toast("error", "Not authenticated");
@@ -54,168 +227,788 @@ export default function CreativesPage() {
       return;
     }
 
-    for (let i = 0; i < REQUESTS.length; i++) {
-      const req = REQUESTS[i];
-      setCurrentIndex(i);
-      try {
-        const res = await fetch("/api/creatives/generate-one", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            projectId,
-            size: req.size,
-            platform: req.platform,
-            style: req.style,
-          }),
-        });
+    try {
+      const res = await fetch("/api/creatives/generate-one", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          projectId,
+          size: "1080x1080",
+          platform: "instagram",
+          concept: selectedConcept,
+          subject: selectedSubject,
+          overlayText: selectedCopy || undefined,
+          language: LANGUAGES.find((l) => l.code === selectedLanguage)?.label,
+          country: COUNTRIES.find((c) => c.code === selectedCountry)?.label,
+        }),
+      });
 
-        if (!res.ok) {
-          const err = await res.json();
-          console.error(`Failed ${req.platform}:`, err);
-          continue;
-        }
-
-        const blob = await res.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        const creativeId = res.headers.get("X-Creative-Id") || `local-${i}`;
-
-        setCreatives((prev) => [
-          ...prev,
-          { id: creativeId, blobUrl, size: req.size, platform: req.platform },
-        ]);
-      } catch (error) {
-        console.error(`Failed ${req.platform}:`, error);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(err.error || "Generation failed");
       }
-    }
 
-    setGenerating(false);
-    setCurrentIndex(-1);
-    toast("success", "Images generated!");
+      const json = await res.json();
+
+      setCreative({
+        id: json.id,
+        baseImage: json.baseImage,
+        hookText: json.hookText,
+        subheadline: json.copyTrio?.subheadline || "",
+        cta: json.copyTrio?.cta || "",
+        productName: json.productName,
+        brandColor: json.brandColor,
+        isComplete: json.isComplete || false,
+        size: json.size,
+        platform: json.platform,
+        concept: selectedConcept!,
+        formats: json.formats || [],
+      });
+
+      if (outputType === "video") {
+        // Auto-trigger video generation from the base image
+        toast("success", "이미지 생성 완료! 영상 변환을 시작합니다...");
+        setGeneratingVideo(true);
+        try {
+          const base64 = json.baseImage.split(",")[1];
+          const mimeMatch = json.baseImage.match(/data:([^;]+)/);
+          const videoRes = await fetch("/api/creatives/video", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+              imageBase64: base64,
+              imageMimeType: mimeMatch?.[1] || "image/png",
+              prompt: "Subtle cinematic motion, gentle camera push-in with soft ambient movement. Professional social media ad video.",
+            }),
+          });
+          if (videoRes.ok) {
+            const videoData = await videoRes.json();
+            if (videoData.videoUri) {
+              const vRes = await fetch(videoData.videoUri);
+              setVideoUrl(URL.createObjectURL(await vRes.blob()));
+            } else if (videoData.videoBase64) {
+              const bin = atob(videoData.videoBase64);
+              const bytes = new Uint8Array(bin.length);
+              for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+              setVideoUrl(URL.createObjectURL(new Blob([bytes], { type: videoData.mimeType })));
+            }
+            toast("success", "영상이 생성되었습니다!");
+          }
+        } catch (e) {
+          console.error("Video generation failed:", e);
+          toast("error", "영상 생성에 실패했습니다. 이미지는 정상 생성되었습니다.");
+        } finally {
+          setGeneratingVideo(false);
+        }
+      } else {
+        toast("success", `${json.formats?.length || 1}개 포맷이 생성되었습니다!`);
+      }
+      refreshProfile(); // Update credit balance in UI
+    } catch (error) {
+      toast("error", error instanceof Error ? error.message : "생성에 실패했습니다");
+    } finally {
+      stopTimer();
+      setGenerating(false);
+    }
   };
 
-  // No images and not generating
-  if (creatives.length === 0 && !generating) {
+  const handleExportAll = async () => {
+    if (!creative) return;
+    const JSZip = (await import("jszip")).default;
+    const zip = new JSZip();
+
+    // Render each format with text overlay via hidden canvas
+    for (const fmt of creative.formats) {
+      const canvas = document.createElement("canvas");
+      const [w, h] = fmt.size.split("x").map(Number);
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d")!;
+
+      // Load and draw base image
+      const img = await new Promise<HTMLImageElement>((resolve) => {
+        const i = new window.Image();
+        i.onload = () => resolve(i);
+        i.src = fmt.baseImage;
+      });
+      ctx.drawImage(img, 0, 0, w, h);
+
+      // Simple text overlay
+      const padding = w * 0.08;
+      const fontSize = Math.round(w * 0.065);
+      ctx.font = `800 ${fontSize}px Helvetica, Arial, sans-serif`;
+      ctx.fillStyle = "#FFFFFF";
+      ctx.shadowColor = "rgba(0,0,0,0.7)";
+      ctx.shadowBlur = 12;
+      ctx.shadowOffsetY = 2;
+      ctx.textBaseline = "top";
+      ctx.fillText(creative.hookText, padding, padding + fontSize);
+      ctx.shadowColor = "transparent";
+
+      // Product badge
+      const badgeFontSize = Math.round(w * 0.022);
+      ctx.font = `700 ${badgeFontSize}px Helvetica, Arial, sans-serif`;
+      const badgeW = ctx.measureText(creative.productName).width + 24;
+      const badgeH = badgeFontSize * 2.2;
+      ctx.fillStyle = creative.brandColor;
+      ctx.beginPath();
+      ctx.roundRect(padding, h - padding - badgeH, badgeW, badgeH, badgeH / 2);
+      ctx.fill();
+      ctx.fillStyle = "#FFFFFF";
+      ctx.textBaseline = "middle";
+      ctx.fillText(creative.productName, padding + 12, h - padding - badgeH / 2);
+
+      // Export to blob
+      const blob = await new Promise<Blob>((resolve) => canvas.toBlob((b) => resolve(b!), "image/png"));
+      const safePlatform = fmt.platform.replace(/[^a-z0-9]/g, "_");
+      zip.file(`piped_${safePlatform}_${fmt.size}.png`, blob);
+    }
+
+    const zipBlob = await zip.generateAsync({ type: "blob" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(zipBlob);
+    link.download = `piped_creatives_${creative.concept}.zip`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
+  const handleGenerateVideo = async () => {
+    if (!creative) return;
+    setGeneratingVideo(true);
+    setVideoUrl(null);
+    try {
+      const token = await getAuth_().currentUser?.getIdToken();
+      // Extract base64 from data URL
+      const base64 = creative.baseImage.split(",")[1];
+      const mimeMatch = creative.baseImage.match(/data:([^;]+)/);
+      const mimeType = mimeMatch?.[1] || "image/png";
+
+      const res = await fetch("/api/creatives/video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          imageBase64: base64,
+          imageMimeType: mimeType,
+          prompt: `Subtle cinematic motion based on this ad image. Gentle camera push-in with soft ambient movement. Smooth, professional, suitable for Instagram/Facebook ad. The subject should have subtle natural motion.`,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error);
+      }
+
+      const data = await res.json();
+      if (data.videoUri) {
+        // Download from URI
+        const videoRes = await fetch(data.videoUri);
+        const blob = await videoRes.blob();
+        setVideoUrl(URL.createObjectURL(blob));
+      } else if (data.videoBase64) {
+        const binary = atob(data.videoBase64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const blob = new Blob([bytes], { type: data.mimeType });
+        setVideoUrl(URL.createObjectURL(blob));
+      }
+      toast("success", "영상이 생성되었습니다!");
+      refreshProfile();
+    } catch (error) {
+      toast("error", error instanceof Error ? error.message : "영상 생성 실패");
+    } finally {
+      setGeneratingVideo(false);
+    }
+  };
+
+  const handleReset = () => {
+    setStep("output-type");
+    setSelectedConcept(null);
+    setSelectedSubject("graphic-card");
+    setSelectedCopy("");
+    setCreative(null);
+  };
+
+  const getDisplayContent = (v: CopyVariant) =>
+    v.isEdited && v.editedContent ? v.editedContent : v.content;
+
+  // Copy types good for image overlay (short, punchy text)
+  const overlayableCopy = copyVariants.filter((v) =>
+    ["headline", "cta", "social", "description_short"].includes(v.type)
+  );
+
+  const copyTypeLabels: Record<string, string> = {
+    headline: "Headline",
+    cta: "CTA",
+    social: "Social",
+    description_short: "Short Description",
+  };
+
+  // ─── Step 0: Output Type Selection ───
+  if (step === "output-type") {
     return (
       <div className="mx-auto max-w-2xl">
         <h1 className="text-2xl font-bold text-gray-900">Ad Creatives</h1>
-        <Card className="mt-8">
-          <CardContent className="py-16 text-center">
-            <Image className="mx-auto h-12 w-12 text-purple-300" />
-            <p className="mt-4 text-lg font-medium text-gray-900">
-              Generate Ad Creatives
-            </p>
-            <p className="mt-1 text-sm text-gray-500">
-              Nano Banana 2 will create 2 ad images for Instagram and Facebook.
-            </p>
-            <Button onClick={handleGenerate} className="mt-6" size="lg">
-              <Sparkles className="mr-2 h-4 w-4" />
-              Generate Images
-            </Button>
-          </CardContent>
-        </Card>
+        <p className="mt-1 text-sm text-gray-500">어떤 콘텐츠를 만들까요?</p>
+
+        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          {[
+            {
+              id: "image" as OutputType,
+              icon: Image,
+              title: "이미지 광고",
+              desc: "Instagram, Facebook, Google 용 정적 이미지 광고를 만듭니다.",
+              detail: "AI 이미지 생성 + 텍스트 오버레이 + 5개 포맷 자동 변환",
+              color: "bg-purple-50 text-purple-600 border-purple-200",
+              selectedColor: "border-purple-500 bg-purple-50 ring-2 ring-purple-200",
+            },
+            {
+              id: "video" as OutputType,
+              icon: Video,
+              title: "영상 광고",
+              desc: "이미지를 기반으로 5초 모션 영상을 만듭니다.",
+              detail: "Google Veo AI로 시네마틱 모션 생성",
+              color: "bg-pink-50 text-pink-600 border-pink-200",
+              selectedColor: "border-pink-500 bg-pink-50 ring-2 ring-pink-200",
+            },
+          ].map((opt) => {
+            const Icon = opt.icon;
+            const isSelected = outputType === opt.id;
+            return (
+              <button
+                key={opt.id}
+                onClick={() => setOutputType(opt.id)}
+                className={`group relative rounded-2xl border-2 p-6 text-left transition-all ${
+                  isSelected ? opt.selectedColor : "border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <div className={`flex h-12 w-12 items-center justify-center rounded-xl border ${opt.color}`}>
+                  <Icon className="h-6 w-6" />
+                </div>
+                <h3 className="mt-4 text-lg font-bold text-gray-900">{opt.title}</h3>
+                <p className="mt-1 text-sm text-gray-600">{opt.desc}</p>
+                <p className="mt-2 text-xs text-gray-400">{opt.detail}</p>
+                {isSelected && (
+                  <div className="absolute right-3 top-3">
+                    <CheckCircle className="h-5 w-5 text-indigo-500" />
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-8 flex justify-end">
+          <Button onClick={() => setStep("copy")} size="lg">
+            다음: 문구 선택
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
       </div>
     );
   }
 
-  return (
-    <div className="mx-auto max-w-5xl">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Ad Creatives</h1>
-        {!generating && (
-          <Button variant="outline" onClick={handleGenerate}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Regenerate
+  // ─── Step 1: Concept Selection ───
+  if (step === "concept") {
+    return (
+      <div className="mx-auto max-w-4xl">
+        <div className="flex items-center gap-3">
+          <button onClick={() => setStep("copy")} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {outputType === "video" ? "영상 광고" : "이미지 광고"} — 컨셉 선택
+            </h1>
+            <p className="mt-0.5 text-sm text-gray-500">
+              어떤 컨셉으로 후킹할지 선택하세요
+            </p>
+          </div>
+        </div>
+
+        {/* AI Recommendations */}
+        {loadingRecs ? (
+          <div className="mt-6 flex items-center gap-2 text-sm text-indigo-600">
+            <Spinner /> AI가 최적의 광고 전략을 분석중...
+          </div>
+        ) : recommendations.length > 0 && (
+          <div className="mt-6">
+            <h2 className="flex items-center gap-1.5 text-sm font-semibold text-indigo-600">
+              <Sparkles className="h-4 w-4" />
+              AI 추천 조합
+            </h2>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+              {recommendations.map((rec, i) => {
+                const isActive = selectedConcept === rec.concept && selectedSubject === rec.subject;
+                const conceptInfo = CREATIVE_CONCEPTS.find((c) => c.id === rec.concept);
+                const subjectInfo = CREATIVE_SUBJECTS.find((s) => s.id === rec.subject);
+                return (
+                  <button
+                    key={i}
+                    onClick={() => { setSelectedConcept(rec.concept); setSelectedSubject(rec.subject); }}
+                    className={`rounded-xl border-2 p-3 text-left transition-all ${
+                      isActive
+                        ? "border-indigo-500 bg-indigo-50 ring-1 ring-indigo-200"
+                        : "border-gray-200 hover:border-indigo-300"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{subjectInfo?.emoji}</span>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">
+                          {conceptInfo?.name} + {subjectInfo?.name}
+                        </p>
+                        <p className="text-xs text-gray-500">{rec.reason}</p>
+                      </div>
+                      {i === 0 && (
+                        <Badge variant="info" className="ml-auto shrink-0 text-[10px]">
+                          #1
+                        </Badge>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <h2 className="mt-8 text-sm font-medium text-gray-700">메시지 전략</h2>
+        <div className="mt-2 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {CREATIVE_CONCEPTS.map((concept) => {
+            const Icon = CONCEPT_ICONS[concept.id];
+            const isSelected = selectedConcept === concept.id;
+            const isRecommended = recommendations.some((r) => r.concept === concept.id);
+            return (
+              <button
+                key={concept.id}
+                onClick={() => setSelectedConcept(concept.id)}
+                className={`group relative rounded-xl border-2 p-5 text-left transition-all ${
+                  isSelected
+                    ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200"
+                    : "border-gray-200 bg-white hover:border-indigo-300 hover:shadow-md"
+                }`}
+              >
+                <div
+                  className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+                    isSelected
+                      ? "bg-indigo-500 text-white"
+                      : "bg-gray-100 text-gray-500 group-hover:bg-indigo-100 group-hover:text-indigo-600"
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+                </div>
+                <h3 className="mt-3 font-semibold text-gray-900">
+                  {concept.name}
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  {concept.description}
+                </p>
+                <p className="mt-2 text-xs text-indigo-600 font-medium">
+                  {concept.hookStrategy}
+                </p>
+                <p className="mt-1.5 rounded bg-gray-50 px-2 py-1 text-xs text-gray-400 italic">
+                  예: &quot;{concept.exampleHook}&quot;
+                </p>
+                {isRecommended && !isSelected && (
+                  <div className="absolute right-3 top-3">
+                    <Badge variant="info" className="text-[10px]">AI 추천</Badge>
+                  </div>
+                )}
+                {isSelected && (
+                  <div className="absolute right-3 top-3">
+                    <CheckCircle className="h-5 w-5 text-indigo-500" />
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Subject Selection */}
+        <div className="mt-8">
+          <h2 className="text-sm font-medium text-gray-700">광고 주인공</h2>
+          <div className="mt-3 flex gap-3">
+            {CREATIVE_SUBJECTS.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setSelectedSubject(s.id)}
+                className={`flex flex-1 items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition-all ${
+                  selectedSubject === s.id
+                    ? "border-indigo-500 bg-indigo-50"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <span className="text-2xl">{s.emoji}</span>
+                <div>
+                  <p className="font-semibold text-gray-900">{s.name}</p>
+                  <p className="text-xs text-gray-500">{s.description}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-8 flex justify-end">
+          <Button
+            onClick={() => { setStep("generate"); handleGenerate(); }}
+            disabled={!selectedConcept}
+            size="lg"
+          >
+            <Sparkles className="mr-2 h-4 w-4" />
+            생성하기 ({selectedSubject === "graphic-card" ? 5 : 15} 크레딧)
           </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Step 2: Copy Selection ───
+  if (step === "copy" && !generating && !creative) {
+    return (
+      <div className="mx-auto max-w-4xl">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setStep("output-type")}
+            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              마케팅 문구 선택
+            </h1>
+            <p className="mt-0.5 text-sm text-gray-500">
+              이미지에 넣을 후킹 문구를 선택하세요
+            </p>
+          </div>
+        </div>
+
+        {/* Selected concept badge */}
+        <div className="mt-4">
+          <Badge variant="info" className="text-sm">
+            {CREATIVE_CONCEPTS.find((c) => c.id === selectedConcept)?.name}
+          </Badge>
+          <Badge variant="default" className="text-sm">
+            {CREATIVE_SUBJECTS.find((s) => s.id === selectedSubject)?.emoji}{" "}
+            {CREATIVE_SUBJECTS.find((s) => s.id === selectedSubject)?.name}
+          </Badge>
+        </div>
+
+        {/* Custom text input */}
+        <div className="mt-6">
+          <label className="block text-sm font-medium text-gray-700">
+            직접 입력
+          </label>
+          <div className="mt-1.5 flex gap-2">
+            <input
+              type="text"
+              value={selectedCopy}
+              onChange={(e) => setSelectedCopy(e.target.value)}
+              placeholder="이미지에 표시할 마케팅 문구를 입력하세요"
+              className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              maxLength={80}
+            />
+            {selectedCopy && (
+              <button
+                onClick={() => setSelectedCopy("")}
+                className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <p className="mt-1 text-xs text-gray-400">
+            {selectedCopy.length}/80 — 짧고 강렬할수록 후킹 효과가 높아요
+          </p>
+        </div>
+
+        {/* Previously generated copy */}
+        {loadingCopy ? (
+          <div className="mt-8 flex justify-center py-8">
+            <Spinner />
+          </div>
+        ) : overlayableCopy.length > 0 ? (
+          <div className="mt-8">
+            <h2 className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <Type className="h-4 w-4" />
+              이전에 생성한 마케팅 문구
+            </h2>
+            <div className="mt-3 space-y-2 max-h-96 overflow-y-auto">
+              {overlayableCopy.map((variant) => {
+                const content = getDisplayContent(variant);
+                const isSelected = selectedCopy === content;
+                return (
+                  <button
+                    key={variant.id}
+                    onClick={() =>
+                      setSelectedCopy(isSelected ? "" : content)
+                    }
+                    className={`w-full rounded-lg border px-4 py-3 text-left transition-all ${
+                      isSelected
+                        ? "border-indigo-500 bg-indigo-50"
+                        : "border-gray-200 bg-white hover:border-indigo-300"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm text-gray-900">{content}</p>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Badge variant="default">
+                          {copyTypeLabels[variant.type] || variant.type}
+                        </Badge>
+                        {variant.isFavorited && (
+                          <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+                        )}
+                        {isSelected && (
+                          <CheckCircle className="h-4 w-4 text-indigo-500" />
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="mt-8 rounded-lg border border-dashed border-gray-300 p-6 text-center">
+            <Type className="mx-auto h-8 w-8 text-gray-300" />
+            <p className="mt-2 text-sm text-gray-500">
+              아직 생성된 마케팅 문구가 없습니다
+            </p>
+            <p className="mt-1 text-xs text-gray-400">
+              직접 입력하거나, Copy 단계에서 먼저 문구를 생성하세요
+            </p>
+          </div>
+        )}
+
+        <div className="mt-8 flex items-center justify-between">
+          <p className="text-sm text-gray-500">
+            {selectedCopy
+              ? `선택된 문구: "${selectedCopy.slice(0, 40)}${selectedCopy.length > 40 ? "..." : ""}"`
+              : "문구 미선택 시 제품 가치 제안이 자동으로 사용됩니다"}
+          </p>
+          <Button onClick={() => setStep("concept")} size="lg">
+            다음: 컨셉 선택
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Step 3: Generation & Results ───
+  return (
+    <div className="mx-auto max-w-6xl">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Ad Creatives</h1>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <Badge variant="info">
+              {CREATIVE_CONCEPTS.find((c) => c.id === selectedConcept)?.name}
+            </Badge>
+            <Badge variant="default">
+              {CREATIVE_SUBJECTS.find((s) => s.id === selectedSubject)?.emoji}{" "}
+              {CREATIVE_SUBJECTS.find((s) => s.id === selectedSubject)?.name}
+            </Badge>
+          </div>
+        </div>
+        {!generating && (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleReset}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              다시 선택
+            </Button>
+            <Button variant="outline" onClick={handleGenerate}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              재생성
+            </Button>
+            {creative && (
+              <>
+                <Button variant="outline" onClick={handleGenerateVideo} loading={generatingVideo}>
+                  <Video className="mr-2 h-4 w-4" />
+                  {generatingVideo ? "영상 생성중..." : "영상 만들기 (30 크레딧)"}
+                </Button>
+                <Button onClick={handleExportAll}>
+                  <Package className="mr-2 h-4 w-4" />
+                  ZIP 내보내기
+                </Button>
+              </>
+            )}
+          </div>
         )}
       </div>
 
-      <div className="mt-6 grid gap-6 sm:grid-cols-2">
-        {REQUESTS.map((req, i) => {
-          const creative = creatives.find(
-            (c) => c.platform === req.platform && c.size === req.size
-          );
-          const isCurrent = generating && currentIndex === i;
-          const isWaiting = generating && currentIndex < i;
-          const isDone = !!creative;
+      {/* Generating state */}
+      {generating && (
+        <Card className="mt-6">
+          <CardContent className="py-16 text-center">
+            <Spinner size="lg" />
+            <p className="mt-4 text-lg font-medium text-indigo-600">
+              {CREATIVE_CONCEPTS.find((c) => c.id === selectedConcept)?.name} 크리에이티브 생성중...
+            </p>
+            <p className="mt-1 text-sm text-gray-400">
+              {elapsed}초 경과 — AI가 이미지를 생성하고 5개 포맷으로 변환합니다
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
-          return (
-            <Card key={`${req.platform}-${req.size}`} className="overflow-hidden">
-              <div className="relative aspect-square bg-gray-50">
-                {isDone ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={creative.blobUrl}
-                    alt={`Creative for ${req.platform}`}
-                    className="h-full w-full object-cover"
-                  />
-                ) : isCurrent ? (
-                  <div className="flex h-full flex-col items-center justify-center">
-                    <Spinner size="lg" />
-                    <p className="mt-3 text-sm font-medium text-indigo-600">
-                      Generating {req.styleLabel}...
-                    </p>
-                    <p className="mt-1 text-xs text-gray-400">
-                      ~20 seconds
-                    </p>
-                  </div>
-                ) : isWaiting ? (
-                  <div className="flex h-full flex-col items-center justify-center text-gray-300">
-                    <Image className="h-8 w-8" />
-                    <p className="mt-2 text-xs">Waiting</p>
-                  </div>
-                ) : (
-                  <div className="flex h-full flex-col items-center justify-center text-gray-200">
-                    <Image className="h-8 w-8" />
-                  </div>
-                )}
-              </div>
-              <CardContent className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Badge variant={isDone ? "success" : isCurrent ? "info" : "default"}>
-                    {platformLabels[req.platform]}
-                  </Badge>
-                  <span className="text-xs text-gray-500">{req.size}</span>
-                  {isDone && <CheckCircle className="h-4 w-4 text-green-500" />}
+      {/* Results: all format grid */}
+      {creative && !generating && (
+        <>
+          {/* Smart Copy Trio */}
+          {(creative.hookText || creative.subheadline || creative.cta) && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {creative.hookText && (
+                <Badge variant="info">&quot;{creative.hookText}&quot;</Badge>
+              )}
+              {creative.subheadline && (
+                <Badge variant="default">{creative.subheadline.slice(0, 40)}{creative.subheadline.length > 40 ? "..." : ""}</Badge>
+              )}
+              {creative.cta && (
+                <Badge variant="success">{creative.cta}</Badge>
+              )}
+            </div>
+          )}
+
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {creative.formats.map((fmt) => (
+              <Card key={fmt.size} className="overflow-hidden">
+                <div className="relative aspect-square bg-gray-50">
+                  {creative.isComplete ? (
+                    // Graphic card — already has text baked in, show as-is
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={fmt.baseImage}
+                      alt=""
+                      className="h-full w-full cursor-pointer object-cover"
+                      onClick={() => setEditingCreative({
+                        baseImage: fmt.baseImage,
+                        hookText: creative.hookText,
+                        subheadline: creative.subheadline,
+                        cta: creative.cta,
+                        productName: creative.productName,
+                        brandColor: creative.brandColor,
+                        size: fmt.size,
+                      })}
+                    />
+                  ) : (
+                    // AI-generated image — add text overlay via Canvas
+                    <CreativePreview
+                      baseImage={fmt.baseImage}
+                      hookText={creative.hookText}
+                      subheadline={creative.subheadline}
+                      cta={creative.cta}
+                      productName={creative.productName}
+                      brandColor={creative.brandColor}
+                      size={fmt.size}
+                      onClick={() => setEditingCreative({
+                        baseImage: fmt.baseImage,
+                        hookText: creative.hookText,
+                        subheadline: creative.subheadline,
+                        cta: creative.cta,
+                        productName: creative.productName,
+                        brandColor: creative.brandColor,
+                        size: fmt.size,
+                      })}
+                    />
+                  )}
                 </div>
-                {isDone && (
-                  <a
-                    href={creative.blobUrl}
-                    download={`piped-${req.platform}-${req.size}.png`}
+                <CardContent className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{fmt.label}</p>
+                    <p className="text-xs text-gray-400">{fmt.size}</p>
+                  </div>
+                  <button
+                    onClick={() => setEditingCreative({
+                      baseImage: fmt.baseImage,
+                      hookText: creative.hookText,
+                      subheadline: creative.subheadline,
+                      cta: creative.cta,
+                      productName: creative.productName,
+                      brandColor: creative.brandColor,
+                      size: fmt.size,
+                    })}
                     className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
                   >
-                    <Download className="h-4 w-4" />
-                  </a>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Next Step */}
-      {!generating && creatives.length > 0 && (
-        <div className="mt-8 rounded-xl border border-orange-200 bg-orange-50 p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100">
-              <Megaphone className="h-5 w-5 text-orange-600" />
-            </div>
-            <div>
-              <p className="font-medium text-gray-900">Next: Launch Campaigns</p>
-              <p className="text-sm text-gray-500">
-                Set up ad campaigns on Meta or Google Ads
-              </p>
-            </div>
+                    <Edit3 className="h-4 w-4" />
+                  </button>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-          <Link href={`/projects/${projectId}/campaigns/new`}>
-            <Button>
-              Continue
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </Link>
-        </div>
+
+          {/* Video Result */}
+          {videoUrl && (
+            <div className="mt-6">
+              <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                <Video className="h-4 w-4 text-indigo-600" />
+                생성된 영상
+              </h3>
+              <div className="mt-2 overflow-hidden rounded-xl border border-gray-200 bg-black">
+                <video
+                  src={videoUrl}
+                  controls
+                  autoPlay
+                  loop
+                  muted
+                  className="mx-auto max-h-96 w-full object-contain"
+                />
+              </div>
+              <div className="mt-2 flex gap-2">
+                <a
+                  href={videoUrl}
+                  download="piped-ad-video.mp4"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  <Package className="h-3.5 w-3.5" />
+                  영상 다운로드
+                </a>
+              </div>
+            </div>
+          )}
+
+          {generatingVideo && (
+            <div className="mt-6 rounded-xl border border-indigo-200 bg-indigo-50 p-6 text-center">
+              <Spinner size="lg" />
+              <p className="mt-3 text-sm font-medium text-indigo-700">Veo로 영상을 생성하고 있습니다...</p>
+              <p className="mt-1 text-xs text-indigo-500">약 1-3분 소요됩니다</p>
+            </div>
+          )}
+
+          {/* Next Step */}
+          <div className="mt-8 rounded-xl border border-orange-200 bg-orange-50 p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100">
+                <Megaphone className="h-5 w-5 text-orange-600" />
+              </div>
+              <div>
+                <p className="font-medium text-gray-900">
+                  Next: Launch Campaigns
+                </p>
+                <p className="text-sm text-gray-500">
+                  Set up ad campaigns on Meta or Google Ads
+                </p>
+              </div>
+            </div>
+            <Link href={`/projects/${projectId}/campaigns/new`}>
+              <Button>
+                Continue
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+        </>
+      )}
+
+      {/* Editor Modal */}
+      {editingCreative && (
+        <CreativeEditor
+          data={editingCreative}
+          onClose={() => setEditingCreative(null)}
+        />
       )}
     </div>
   );

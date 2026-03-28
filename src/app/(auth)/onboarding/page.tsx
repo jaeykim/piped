@@ -7,6 +7,7 @@ import { useAuth } from "@/context/auth-context";
 import { createUserProfile } from "@/lib/firebase/auth";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
+import { useLocale } from "@/context/locale-context";
 import type { UserRole } from "@/types/user";
 
 export default function OnboardingPage() {
@@ -15,6 +16,7 @@ export default function OnboardingPage() {
   const { user, refreshProfile } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
+  const { t } = useLocale();
 
   const handleContinue = async () => {
     if (!user || !selected) return;
@@ -25,7 +27,7 @@ export default function OnboardingPage() {
       router.push("/dashboard");
     } catch (err) {
       console.error("Onboarding error:", err);
-      toast("error", err instanceof Error ? err.message : "Failed to set up profile");
+      toast("error", err instanceof Error ? err.message : t.common.error);
     } finally {
       setLoading(false);
     }
@@ -35,14 +37,14 @@ export default function OnboardingPage() {
     {
       id: "owner" as UserRole,
       icon: FolderKanban,
-      title: "Product Owner",
-      desc: "I built a product and want to automate marketing with AI-generated copy, creatives, and ad campaigns.",
+      title: t.onboarding.owner,
+      desc: t.onboarding.ownerDesc,
     },
     {
       id: "influencer" as UserRole,
       icon: Users,
-      title: "Influencer",
-      desc: "I want to discover great products, promote them to my audience, and earn commissions through affiliate links.",
+      title: t.onboarding.influencer,
+      desc: t.onboarding.influencerDesc,
     },
   ];
 
@@ -50,14 +52,10 @@ export default function OnboardingPage() {
     <div>
       <div className="flex items-center gap-2 mb-2">
         <Zap className="h-5 w-5 text-indigo-600" />
-        <span className="text-sm font-medium text-indigo-600">
-          One more step
-        </span>
+        <span className="text-sm font-medium text-indigo-600">Piped</span>
       </div>
-      <h1 className="text-2xl font-bold text-gray-900">How will you use Piped?</h1>
-      <p className="mt-2 text-sm text-gray-600">
-        Choose your role to personalize your experience.
-      </p>
+      <h1 className="text-2xl font-bold text-gray-900">{t.onboarding.title}</h1>
+      <p className="mt-2 text-sm text-gray-600">{t.onboarding.subtitle}</p>
 
       <div className="mt-6 space-y-3">
         {roles.map((role) => {
@@ -79,11 +77,7 @@ export default function OnboardingPage() {
                     isSelected ? "bg-indigo-600" : "bg-gray-100"
                   }`}
                 >
-                  <Icon
-                    className={`h-5 w-5 ${
-                      isSelected ? "text-white" : "text-gray-600"
-                    }`}
-                  />
+                  <Icon className={`h-5 w-5 ${isSelected ? "text-white" : "text-gray-600"}`} />
                 </div>
                 <div>
                   <p className="font-semibold text-gray-900">{role.title}</p>
@@ -101,7 +95,7 @@ export default function OnboardingPage() {
         disabled={!selected}
         className="mt-6 w-full"
       >
-        Continue
+        {t.onboarding.continue}
       </Button>
     </div>
   );

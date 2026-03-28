@@ -7,6 +7,7 @@ import { signIn, signInWithGoogle } from "@/lib/firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
+import { useLocale } from "@/context/locale-context";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -14,6 +15,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+  const { t } = useLocale();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,7 +24,7 @@ export default function LoginPage() {
       await signIn(email, password);
       router.push("/dashboard");
     } catch {
-      toast("error", "Invalid email or password");
+      toast("error", t.auth.invalidCredentials);
     } finally {
       setLoading(false);
     }
@@ -30,23 +32,28 @@ export default function LoginPage() {
 
   const handleGoogle = async () => {
     try {
-      await signInWithGoogle();
-      router.push("/dashboard");
+      const user = await signInWithGoogle();
+      // Check if user already has a profile (existing user)
+      const { getUserProfile } = await import("@/lib/firebase/auth");
+      const profile = await getUserProfile(user.uid);
+      if (profile?.onboardingComplete) {
+        router.push("/dashboard");
+      } else {
+        router.push("/onboarding");
+      }
     } catch {
-      toast("error", "Google sign in failed");
+      toast("error", t.auth.googleFailed);
     }
   };
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900">Welcome back</h1>
-      <p className="mt-2 text-sm text-gray-600">
-        Sign in to your Piped account
-      </p>
+      <h1 className="text-2xl font-bold text-gray-900">{t.auth.welcomeBack}</h1>
+      <p className="mt-2 text-sm text-gray-600">{t.auth.signInDesc}</p>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <Input
-          label="Email"
+          label={t.auth.email}
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -54,15 +61,14 @@ export default function LoginPage() {
           required
         />
         <Input
-          label="Password"
+          label={t.auth.password}
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="Enter your password"
           required
         />
         <Button type="submit" loading={loading} className="w-full">
-          Sign In
+          {t.auth.signIn}
         </Button>
       </form>
 
@@ -72,18 +78,14 @@ export default function LoginPage() {
         <div className="h-px flex-1 bg-gray-200" />
       </div>
 
-      <Button
-        variant="outline"
-        onClick={handleGoogle}
-        className="mt-4 w-full"
-      >
-        Continue with Google
+      <Button variant="outline" onClick={handleGoogle} className="mt-4 w-full">
+        {t.auth.continueWithGoogle}
       </Button>
 
       <p className="mt-6 text-center text-sm text-gray-600">
-        Don&apos;t have an account?{" "}
+        {t.auth.noAccount}{" "}
         <Link href="/signup" className="font-medium text-indigo-600 hover:text-indigo-700">
-          Sign up
+          {t.auth.signUp}
         </Link>
       </p>
     </div>

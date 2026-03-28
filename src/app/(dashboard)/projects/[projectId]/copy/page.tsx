@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import {
   collection,
@@ -11,6 +11,7 @@ import {
   orderBy,
 } from "firebase/firestore";
 import { getDb, getAuth_ } from "@/lib/firebase/client";
+import { useAuth } from "@/context/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs } from "@/components/ui/tabs";
@@ -27,9 +28,38 @@ import {
   X,
   RefreshCw,
   ArrowRight,
+  CheckCircle,
   Image as ImageIcon,
 } from "lucide-react";
 import type { CopyVariant, CopyType } from "@/types/copy";
+
+const LANGUAGES = [
+  { code: "ko", label: "한국어", flag: "🇰🇷" },
+  { code: "en", label: "English", flag: "🇺🇸" },
+  { code: "ja", label: "日本語", flag: "🇯🇵" },
+  { code: "zh", label: "中文", flag: "🇨🇳" },
+  { code: "es", label: "Español", flag: "🇪🇸" },
+  { code: "fr", label: "Français", flag: "🇫🇷" },
+  { code: "de", label: "Deutsch", flag: "🇩🇪" },
+  { code: "pt", label: "Português", flag: "🇧🇷" },
+  { code: "vi", label: "Tiếng Việt", flag: "🇻🇳" },
+  { code: "th", label: "ไทย", flag: "🇹🇭" },
+];
+
+const COUNTRIES = [
+  { code: "KR", label: "대한민국", flag: "🇰🇷" },
+  { code: "US", label: "미국", flag: "🇺🇸" },
+  { code: "JP", label: "일본", flag: "🇯🇵" },
+  { code: "CN", label: "중국", flag: "🇨🇳" },
+  { code: "GB", label: "영국", flag: "🇬🇧" },
+  { code: "DE", label: "독일", flag: "🇩🇪" },
+  { code: "FR", label: "프랑스", flag: "🇫🇷" },
+  { code: "BR", label: "브라질", flag: "🇧🇷" },
+  { code: "IN", label: "인도", flag: "🇮🇳" },
+  { code: "VN", label: "베트남", flag: "🇻🇳" },
+  { code: "TH", label: "태국", flag: "🇹🇭" },
+  { code: "GLOBAL", label: "글로벌 (전체)", flag: "🌏" },
+];
 
 const typeLabels: Record<CopyType, string> = {
   headline: "Headlines",
@@ -51,12 +81,14 @@ function CopyCard({
   onUpdate: () => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [editText, setEditText] = useState(variant.editedContent || variant.content);
+  const [editText, setEditText] = useState(
+    variant.editedContent || variant.content
+  );
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
   const isAdCopy = variant.type === "ad_meta" || variant.type === "ad_google";
-  let displayContent = variant.editedContent || variant.content;
+  const displayContent = variant.editedContent || variant.content;
   let adData: Record<string, string> | null = null;
 
   if (isAdCopy) {
@@ -185,9 +217,12 @@ export default function CopyPage() {
   const [variants, setVariants] = useState<CopyVariant[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState("ko");
+  const [selectedCountry, setSelectedCountry] = useState("KR");
   const { toast } = useToast();
+  const { refreshProfile } = useAuth();
 
-  const loadVariants = async () => {
+  const loadVariants = useCallback(async () => {
     const q = query(
       collection(getDb(), "projects", projectId, "copyVariants"),
       orderBy("createdAt", "desc")
@@ -197,30 +232,37 @@ export default function CopyPage() {
       snap.docs.map((d) => ({ id: d.id, ...d.data() }) as CopyVariant)
     );
     setLoading(false);
-  };
+  }, [projectId]);
 
   useEffect(() => {
     loadVariants();
-  }, [projectId]);
+  }, [loadVariants]);
 
   const handleGenerate = async () => {
     setGenerating(true);
     try {
       const token = await getAuth_().currentUser?.getIdToken();
+      const langLabel = LANGUAGES.find((l) => l.code === selectedLanguage)?.label;
+      const countryLabel = COUNTRIES.find((c) => c.code === selectedCountry)?.label;
       const res = await fetch("/api/copy/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ projectId }),
+        body: JSON.stringify({
+          projectId,
+          language: langLabel,
+          country: countryLabel,
+        }),
       });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error);
       }
-      toast("success", "Marketing copy generated!");
+      toast("success", "마케팅 문구가 생성되었습니다!");
       await loadVariants();
+      refreshProfile(); // Update credit balance
     } catch (error) {
       toast(
         "error",
@@ -239,35 +281,104 @@ export default function CopyPage() {
     );
   }
 
-  if (variants.length === 0) {
+  // ─── No variants: show language/country selector → auto generate ───
+  if (variants.length === 0 && !generating) {
+    return (
+      <div className="mx-auto max-w-4xl">
+        <h1 className="text-2xl font-bold text-gray-900">Marketing Copy</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          대상 국가와 언어를 선택하면 바로 마케팅 문구를 생성합니다
+        </p>
+
+        {/* Target Country */}
+        <div className="mt-8">
+          <h2 className="text-sm font-medium text-gray-700">대상 국가</h2>
+          <div className="mt-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
+            {COUNTRIES.map((c) => (
+              <button
+                key={c.code}
+                onClick={() => setSelectedCountry(c.code)}
+                className={`flex items-center gap-2.5 rounded-lg border-2 px-3 py-2.5 text-left text-sm transition-all ${
+                  selectedCountry === c.code
+                    ? "border-indigo-500 bg-indigo-50"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <span className="text-lg">{c.flag}</span>
+                <span className="font-medium text-gray-900">{c.label}</span>
+                {selectedCountry === c.code && (
+                  <CheckCircle className="ml-auto h-4 w-4 text-indigo-500" />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Language */}
+        <div className="mt-8">
+          <h2 className="text-sm font-medium text-gray-700">광고 언어</h2>
+          <div className="mt-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
+            {LANGUAGES.map((l) => (
+              <button
+                key={l.code}
+                onClick={() => setSelectedLanguage(l.code)}
+                className={`flex items-center gap-2 rounded-lg border-2 px-3 py-2 text-sm transition-all ${
+                  selectedLanguage === l.code
+                    ? "border-indigo-500 bg-indigo-50"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <span>{l.flag}</span>
+                <span className="font-medium text-gray-900">{l.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-8 flex justify-end">
+          <Button onClick={handleGenerate} size="lg">
+            <Sparkles className="mr-2 h-4 w-4" />
+            마케팅 문구 생성하기 (10 크레딧)
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Generating state ───
+  if (generating) {
     return (
       <div className="mx-auto max-w-2xl">
         <h1 className="text-2xl font-bold text-gray-900">Marketing Copy</h1>
         <Card className="mt-8">
           <CardContent className="py-16 text-center">
-            <Sparkles className="mx-auto h-12 w-12 text-indigo-300" />
+            <Spinner size="lg" />
             <p className="mt-4 text-lg font-medium text-gray-900">
-              Generate Marketing Copy
+              마케팅 문구 생성 중...
             </p>
             <p className="mt-1 text-sm text-gray-500">
-              AI will create headlines, descriptions, ad copy, and social posts
-              based on your website analysis.
+              Headlines, Descriptions, Ad Copy, Social Posts를 생성하고 있습니다
             </p>
-            <Button
-              onClick={handleGenerate}
-              loading={generating}
-              className="mt-6"
-              size="lg"
-            >
-              <Sparkles className="mr-2 h-4 w-4" />
-              Generate All Copy
-            </Button>
+            <div className="mt-6 space-y-2">
+              {["Headlines 생성중", "Descriptions 생성중", "Ad Copy 생성중", "Social Posts 생성중"].map(
+                (step, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-center gap-2 text-sm text-gray-500"
+                  >
+                    <div className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse" />
+                    {step}
+                  </div>
+                )
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
     );
   }
 
+  // ─── Results ───
   const types = Object.keys(typeLabels) as CopyType[];
   const tabs = types
     .filter((type) => variants.some((v) => v.type === type))
@@ -314,8 +425,12 @@ export default function CopyPage() {
             <ImageIcon className="h-5 w-5 text-indigo-600" />
           </div>
           <div>
-            <p className="font-medium text-gray-900">Next: Generate Ad Creatives</p>
-            <p className="text-sm text-gray-500">Create stunning visuals powered by Nano Banana 2</p>
+            <p className="font-medium text-gray-900">
+              Next: Generate Ad Creatives
+            </p>
+            <p className="text-sm text-gray-500">
+              Create stunning visuals powered by AI
+            </p>
           </div>
         </div>
         <Link href={`/projects/${projectId}/creatives`}>

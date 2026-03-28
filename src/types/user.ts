@@ -8,6 +8,7 @@ export interface UserProfile {
   role: UserRole;
   createdAt: Date;
   updatedAt: Date;
+  credits: number;
   onboardingComplete: boolean;
   integrations: {
     meta?: {

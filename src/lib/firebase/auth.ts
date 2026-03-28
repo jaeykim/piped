@@ -43,6 +43,7 @@ export async function createUserProfile(
     displayName: displayName || user.displayName || user.email?.split("@")[0],
     photoURL: user.photoURL || null,
     role,
+    credits: 50, // Free starter credits (enough for: analysis 5 + copy 10 + images 5×2 + extras)
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     onboardingComplete: true,

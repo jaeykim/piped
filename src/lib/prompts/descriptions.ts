@@ -1,6 +1,7 @@
 import type { SiteAnalysis } from "@/types/analysis";
 
-export function buildDescriptionPrompt(analysis: SiteAnalysis) {
+export function buildDescriptionPrompt(analysis: SiteAnalysis, language?: string) {
+  const langRule = language ? `\nWrite ALL descriptions in ${language}.` : "";
   return {
     systemPrompt:
       "You are a world-class copywriter. Return ONLY valid JSON with no markdown.",
@@ -18,6 +19,6 @@ Generate the following as a JSON object:
   "long": ["2 long descriptions (2-3 sentences, around 250 chars each)"]
 }
 
-Make each description unique in angle: feature-focused, benefit-focused, emotion-focused.`,
+Make each description unique in angle: feature-focused, benefit-focused, emotion-focused.${langRule}`,
   };
 }

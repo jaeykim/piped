@@ -1,0 +1,388 @@
+"use client";
+
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import { Download, Type, Sun, Contrast, X, RotateCcw, Eye, EyeOff, GripVertical } from "lucide-react";
+
+export interface CreativeEditorData {
+  baseImage: string;
+  hookText: string;
+  subheadline?: string;
+  cta?: string;
+  productName: string;
+  brandColor: string;
+  size: string;
+}
+
+interface TextLayer {
+  id: string;
+  label: string;
+  text: string;
+  visible: boolean;
+  x: number; // percentage 0-100
+  y: number; // percentage 0-100
+  fontSize: number; // percentage of default
+}
+
+interface Props {
+  data: CreativeEditorData;
+  onClose: () => void;
+}
+
+// Smart Korean word wrap
+function smartWrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const result: string[] = [];
+  const cjk = /[\u3000-\u9fff\uac00-\ud7af]/;
+  for (const para of text.split("\n")) {
+    if (!para.trim()) { result.push(""); continue; }
+    if (cjk.test(para)) {
+      const words = para.split(" ");
+      let cur = "";
+      for (const word of words) {
+        const test = cur ? cur + " " + word : word;
+        if (ctx.measureText(test).width > maxWidth && cur) { result.push(cur); cur = word; }
+        else cur = test;
+      }
+      // If a single word is too long, break by character
+      if (cur && ctx.measureText(cur).width > maxWidth) {
+        let charCur = "";
+        for (const ch of cur) {
+          if (ctx.measureText(charCur + ch).width > maxWidth && charCur) { result.push(charCur); charCur = ch; }
+          else charCur += ch;
+        }
+        if (charCur) result.push(charCur);
+      } else if (cur) {
+        result.push(cur);
+      }
+    } else {
+      let cur = "";
+      for (const word of para.split(" ")) {
+        const test = cur ? cur + " " + word : word;
+        if (ctx.measureText(test).width > maxWidth && cur) { result.push(cur); cur = word; }
+        else cur = test;
+      }
+      if (cur) result.push(cur);
+    }
+  }
+  return result;
+}
+
+export function CreativeEditor({ data, onClose }: Props) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [baseImg, setBaseImg] = useState<HTMLImageElement | null>(null);
+  const [draggingLayer, setDraggingLayer] = useState<string | null>(null);
+
+  // Image adjustments
+  const [brightness, setBrightness] = useState(100);
+  const [contrast, setContrast] = useState(100);
+  const [saturation, setSaturation] = useState(100);
+  const [overlayOpacity, setOverlayOpacity] = useState(40);
+
+  // Text layers
+  const [layers, setLayers] = useState<TextLayer[]>([
+    { id: "headline", label: "헤드라인", text: data.hookText, visible: true, x: 7, y: 5, fontSize: 100 },
+    { id: "sub", label: "서브 텍스트", text: data.subheadline || "", visible: !!(data.subheadline), x: 7, y: 40, fontSize: 100 },
+    { id: "cta", label: "CTA 버튼", text: data.cta || "", visible: !!(data.cta), x: 30, y: 85, fontSize: 100 },
+    { id: "brand", label: "브랜드", text: data.productName, visible: true, x: 7, y: 92, fontSize: 100 },
+  ]);
+
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => setBaseImg(img);
+    img.src = data.baseImage;
+  }, [data.baseImage]);
+
+  const updateLayer = (id: string, updates: Partial<TextLayer>) => {
+    setLayers((prev) => prev.map((l) => l.id === id ? { ...l, ...updates } : l));
+  };
+
+  const render = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !baseImg) return;
+
+    const [w, h] = data.size.split("x").map(Number);
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d")!;
+
+    // Base image
+    ctx.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`;
+    ctx.drawImage(baseImg, 0, 0, w, h);
+    ctx.filter = "none";
+
+    // Gradient overlay for readability
+    const opacity = overlayOpacity / 100;
+    if (opacity > 0) {
+      const topG = ctx.createLinearGradient(0, 0, 0, h * 0.5);
+      topG.addColorStop(0, `rgba(0,0,0,${opacity * 0.7})`);
+      topG.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = topG;
+      ctx.fillRect(0, 0, w, h * 0.5);
+
+      const botG = ctx.createLinearGradient(0, h * 0.5, 0, h);
+      botG.addColorStop(0, "rgba(0,0,0,0)");
+      botG.addColorStop(1, `rgba(0,0,0,${opacity * 0.5})`);
+      ctx.fillStyle = botG;
+      ctx.fillRect(0, h * 0.5, w, h * 0.5);
+    }
+
+    // Render each visible layer
+    for (const layer of layers) {
+      if (!layer.visible || !layer.text.trim()) continue;
+
+      const lx = (layer.x / 100) * w;
+      const ly = (layer.y / 100) * h;
+
+      if (layer.id === "headline") {
+        const fs = Math.round(w * 0.065 * (layer.fontSize / 100));
+        ctx.font = `900 ${fs}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        const maxW = w - lx - w * 0.07;
+
+        // Auto-fit
+        let actualFs = fs;
+        let lines: string[] = [];
+        for (let i = 0; i < 6; i++) {
+          ctx.font = `900 ${actualFs}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+          lines = smartWrap(ctx, layer.text, maxW);
+          if (lines.length <= 4) break;
+          actualFs = Math.round(actualFs * 0.88);
+        }
+        ctx.font = `900 ${actualFs}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+
+        lines.forEach((line, i) => {
+          ctx.shadowColor = "rgba(0,0,0,0.7)";
+          ctx.shadowBlur = 12;
+          ctx.shadowOffsetY = 2;
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fillText(line, lx, ly + i * (actualFs * 1.15));
+        });
+        ctx.shadowColor = "transparent";
+
+      } else if (layer.id === "sub") {
+        const fs = Math.round(w * 0.032 * (layer.fontSize / 100));
+        ctx.font = `500 ${fs}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        const lines = smartWrap(ctx, layer.text, w - lx - w * 0.07);
+        lines.slice(0, 3).forEach((line, i) => {
+          ctx.shadowColor = "rgba(0,0,0,0.4)";
+          ctx.shadowBlur = 6;
+          ctx.fillStyle = "rgba(255,255,255,0.85)";
+          ctx.fillText(line, lx, ly + i * (fs * 1.3));
+        });
+        ctx.shadowColor = "transparent";
+
+      } else if (layer.id === "cta") {
+        const fs = Math.round(w * 0.028 * (layer.fontSize / 100));
+        ctx.font = `700 ${fs}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+        const tw = ctx.measureText(layer.text).width + fs * 3;
+        const th = fs * 2.6;
+
+        ctx.fillStyle = data.brandColor;
+        ctx.shadowColor = "rgba(0,0,0,0.25)";
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 3;
+        ctx.beginPath();
+        ctx.roundRect(lx, ly, tw, th, th / 2);
+        ctx.fill();
+        ctx.shadowColor = "transparent";
+
+        ctx.fillStyle = "#FFFFFF";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(layer.text, lx + tw / 2, ly + th / 2);
+
+      } else if (layer.id === "brand") {
+        const fs = Math.round(w * 0.02 * (layer.fontSize / 100));
+        ctx.font = `600 ${fs}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+        const bw = ctx.measureText(layer.text).width + 16;
+        const bh = fs * 2;
+
+        ctx.fillStyle = "rgba(255,255,255,0.12)";
+        ctx.beginPath();
+        ctx.roundRect(lx, ly, bw, bh, bh / 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.7)";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(layer.text, lx + 8, ly + bh / 2);
+      }
+    }
+  }, [baseImg, layers, brightness, contrast, saturation, overlayOpacity, data]);
+
+  useEffect(() => { render(); }, [render]);
+
+  // Drag handling
+  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const [w, h] = data.size.split("x").map(Number);
+    const scaleX = w / rect.width;
+    const scaleY = h / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top) * scaleY;
+
+    // Find which layer was clicked (reverse order = top layer first)
+    for (let i = layers.length - 1; i >= 0; i--) {
+      const l = layers[i];
+      if (!l.visible) continue;
+      const lx = (l.x / 100) * w;
+      const ly = (l.y / 100) * h;
+      const hitW = w * 0.5;
+      const hitH = w * 0.1;
+      if (mx >= lx - 10 && mx <= lx + hitW && my >= ly - 10 && my <= ly + hitH) {
+        setDraggingLayer(l.id);
+        return;
+      }
+    }
+  };
+
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!draggingLayer) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const [w, h] = data.size.split("x").map(Number);
+    const px = ((e.clientX - rect.left) / rect.width) * 100;
+    const py = ((e.clientY - rect.top) / rect.height) * 100;
+    updateLayer(draggingLayer, { x: Math.max(2, Math.min(80, px)), y: Math.max(2, Math.min(95, py)) });
+  };
+
+  const handleCanvasMouseUp = () => { setDraggingLayer(null); };
+
+  const handleDownload = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const link = document.createElement("a");
+    link.download = `piped-${data.size}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  };
+
+  const handleReset = () => {
+    setLayers([
+      { id: "headline", label: "헤드라인", text: data.hookText, visible: true, x: 7, y: 5, fontSize: 100 },
+      { id: "sub", label: "서브 텍스트", text: data.subheadline || "", visible: !!(data.subheadline), x: 7, y: 40, fontSize: 100 },
+      { id: "cta", label: "CTA 버튼", text: data.cta || "", visible: !!(data.cta), x: 30, y: 85, fontSize: 100 },
+      { id: "brand", label: "브랜드", text: data.productName, visible: true, x: 7, y: 92, fontSize: 100 },
+    ]);
+    setBrightness(100); setContrast(100); setSaturation(100); setOverlayOpacity(40);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex bg-black/60 backdrop-blur-sm">
+      {/* Sidebar */}
+      <div className="w-80 shrink-0 overflow-y-auto border-r border-gray-200 bg-white p-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-gray-900">편집</h2>
+          <button onClick={onClose} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <p className="mt-1 text-xs text-gray-400">캔버스에서 텍스트를 드래그하여 위치를 조절하세요</p>
+
+        {/* Text Layers */}
+        <div className="mt-4 space-y-3">
+          {layers.map((layer) => (
+            <div key={layer.id} className="rounded-lg border border-gray-200 p-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <GripVertical className="h-3.5 w-3.5 text-gray-300" />
+                  <span className="text-xs font-semibold text-gray-700">{layer.label}</span>
+                </div>
+                <button
+                  onClick={() => updateLayer(layer.id, { visible: !layer.visible })}
+                  className={`rounded p-1 ${layer.visible ? "text-indigo-600" : "text-gray-300"}`}
+                >
+                  {layer.visible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                </button>
+              </div>
+              {layer.visible && (
+                <div className="mt-2 space-y-2">
+                  {layer.id === "headline" ? (
+                    <textarea
+                      value={layer.text}
+                      onChange={(e) => updateLayer(layer.id, { text: e.target.value })}
+                      className="w-full rounded border border-gray-200 px-2 py-1.5 text-xs focus:border-indigo-400 focus:outline-none"
+                      rows={2}
+                    />
+                  ) : (
+                    <input
+                      value={layer.text}
+                      onChange={(e) => updateLayer(layer.id, { text: e.target.value })}
+                      className="w-full rounded border border-gray-200 px-2 py-1.5 text-xs focus:border-indigo-400 focus:outline-none"
+                    />
+                  )}
+                  <div className="flex items-center gap-2">
+                    <Type className="h-3 w-3 text-gray-400" />
+                    <input
+                      type="range" min={50} max={150} value={layer.fontSize}
+                      onChange={(e) => updateLayer(layer.id, { fontSize: Number(e.target.value) })}
+                      className="flex-1 accent-indigo-600"
+                    />
+                    <span className="text-[10px] text-gray-400 w-8">{layer.fontSize}%</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Overlay opacity */}
+        <div className="mt-4">
+          <label className="text-xs font-medium text-gray-700">배경 어둡기 {overlayOpacity}%</label>
+          <input type="range" min={0} max={80} value={overlayOpacity} onChange={(e) => setOverlayOpacity(Number(e.target.value))} className="mt-1 w-full accent-indigo-600" />
+        </div>
+
+        {/* Image Adjustments */}
+        <div className="mt-4 border-t border-gray-100 pt-3">
+          <h3 className="text-xs font-medium text-gray-700">이미지 조정</h3>
+          <div className="mt-2 space-y-2">
+            <div className="flex items-center gap-2">
+              <Sun className="h-3 w-3 text-gray-400" />
+              <input type="range" min={50} max={150} value={brightness} onChange={(e) => setBrightness(Number(e.target.value))} className="flex-1 accent-indigo-600" />
+              <span className="text-[10px] text-gray-400 w-8">{brightness}%</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Contrast className="h-3 w-3 text-gray-400" />
+              <input type="range" min={50} max={150} value={contrast} onChange={(e) => setContrast(Number(e.target.value))} className="flex-1 accent-indigo-600" />
+              <span className="text-[10px] text-gray-400 w-8">{contrast}%</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-gray-400">채도</span>
+              <input type="range" min={0} max={200} value={saturation} onChange={(e) => setSaturation(Number(e.target.value))} className="flex-1 accent-indigo-600" />
+              <span className="text-[10px] text-gray-400 w-8">{saturation}%</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="mt-4 space-y-2">
+          <Button onClick={handleDownload} className="w-full" size="sm">
+            <Download className="mr-2 h-4 w-4" /> 다운로드
+          </Button>
+          <Button variant="outline" onClick={handleReset} className="w-full" size="sm">
+            <RotateCcw className="mr-2 h-4 w-4" /> 초기화
+          </Button>
+        </div>
+      </div>
+
+      {/* Canvas */}
+      <div className="flex flex-1 items-center justify-center bg-gray-900 p-8">
+        <canvas
+          ref={canvasRef}
+          className={`max-h-full max-w-full rounded-lg shadow-2xl ${draggingLayer ? "cursor-grabbing" : "cursor-grab"}`}
+          style={{ objectFit: "contain" }}
+          onMouseDown={handleCanvasMouseDown}
+          onMouseMove={handleCanvasMouseMove}
+          onMouseUp={handleCanvasMouseUp}
+          onMouseLeave={handleCanvasMouseUp}
+        />
+      </div>
+    </div>
+  );
+}

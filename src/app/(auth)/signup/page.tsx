@@ -7,6 +7,7 @@ import { signUp, signInWithGoogle } from "@/lib/firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
+import { useLocale } from "@/context/locale-context";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -15,11 +16,12 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+  const { t } = useLocale();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password.length < 6) {
-      toast("error", "Password must be at least 6 characters");
+      toast("error", t.auth.passwordMin);
       return;
     }
     setLoading(true);
@@ -27,7 +29,7 @@ export default function SignupPage() {
       await signUp(email, password);
       router.push("/onboarding");
     } catch {
-      toast("error", "Failed to create account. Email may already be in use.");
+      toast("error", t.auth.signUpFailed);
     } finally {
       setLoading(false);
     }
@@ -35,30 +37,33 @@ export default function SignupPage() {
 
   const handleGoogle = async () => {
     try {
-      await signInWithGoogle();
-      router.push("/onboarding");
+      const user = await signInWithGoogle();
+      const { getUserProfile } = await import("@/lib/firebase/auth");
+      const profile = await getUserProfile(user.uid);
+      if (profile?.onboardingComplete) {
+        router.push("/dashboard");
+      } else {
+        router.push("/onboarding");
+      }
     } catch {
-      toast("error", "Google sign up failed");
+      toast("error", t.auth.googleFailed);
     }
   };
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900">Create your account</h1>
-      <p className="mt-2 text-sm text-gray-600">
-        Start automating your marketing in minutes
-      </p>
+      <h1 className="text-2xl font-bold text-gray-900">{t.auth.createAccount}</h1>
+      <p className="mt-2 text-sm text-gray-600">{t.auth.signUpDesc}</p>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <Input
-          label="Name"
+          label={t.auth.displayName}
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Your name"
           required
         />
         <Input
-          label="Email"
+          label={t.auth.email}
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -66,15 +71,14 @@ export default function SignupPage() {
           required
         />
         <Input
-          label="Password"
+          label={t.auth.password}
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="At least 6 characters"
           required
         />
         <Button type="submit" loading={loading} className="w-full">
-          Create Account
+          {t.auth.signUp}
         </Button>
       </form>
 
@@ -84,18 +88,14 @@ export default function SignupPage() {
         <div className="h-px flex-1 bg-gray-200" />
       </div>
 
-      <Button
-        variant="outline"
-        onClick={handleGoogle}
-        className="mt-4 w-full"
-      >
-        Continue with Google
+      <Button variant="outline" onClick={handleGoogle} className="mt-4 w-full">
+        {t.auth.continueWithGoogle}
       </Button>
 
       <p className="mt-6 text-center text-sm text-gray-600">
-        Already have an account?{" "}
+        {t.auth.hasAccount}{" "}
         <Link href="/login" className="font-medium text-indigo-600 hover:text-indigo-700">
-          Sign in
+          {t.auth.signIn}
         </Link>
       </p>
     </div>

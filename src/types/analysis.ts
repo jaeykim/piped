@@ -16,6 +16,7 @@ export interface SiteAnalysis {
   tone: string;
   industry: string;
   brandColors: string[];
+  logoUrl?: string;
   screenshots: string[];
   analyzedAt: Date;
 }

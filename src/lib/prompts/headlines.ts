@@ -1,6 +1,7 @@
 import type { SiteAnalysis } from "@/types/analysis";
 
-export function buildHeadlinePrompt(analysis: SiteAnalysis) {
+export function buildHeadlinePrompt(analysis: SiteAnalysis, language?: string) {
+  const langRule = language ? `\n- Write ALL headlines in ${language}` : "";
   return {
     systemPrompt:
       "You are a world-class copywriter specializing in conversion-optimized headlines. Return ONLY a JSON array of strings.",
@@ -16,7 +17,7 @@ Requirements:
 - Each headline should be under 60 characters
 - Mix of benefit-driven, curiosity-driven, and action-driven styles
 - Avoid cliches and generic phrases
-- Match the brand tone: ${analysis.tone}
+- Match the brand tone: ${analysis.tone}${langRule}
 
 Return as JSON array: ["headline1", "headline2", ...]`,
   };

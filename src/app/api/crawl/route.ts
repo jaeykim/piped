@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { crawlUrl } from "@/lib/services/crawler";
 import { analyzeWebsite } from "@/lib/services/analyzer";
+import { requireCredits, deductCredits } from "@/lib/services/credits";
 import { FieldValue } from "firebase-admin/firestore";
 
 export async function POST(request: NextRequest) {
@@ -14,6 +15,12 @@ export async function POST(request: NextRequest) {
     const token = authHeader.split("Bearer ")[1];
     const decoded = await adminAuth.verifyIdToken(token);
     const uid = decoded.uid;
+
+    // Check credits
+    const creditCheck = await requireCredits(uid, "crawl");
+    if (!creditCheck.ok) {
+      return NextResponse.json({ error: creditCheck.error }, { status: 402 });
+    }
 
     const body = await request.json();
     const { url, projectId } = body;
@@ -57,6 +64,9 @@ export async function POST(request: NextRequest) {
       pipelineStage: "copy",
       updatedAt: FieldValue.serverTimestamp(),
     });
+
+    // Deduct credits
+    await deductCredits(uid, creditCheck.cost, "crawl", `Site analysis for ${url}`);
 
     return NextResponse.json({
       success: true,

@@ -10,6 +10,8 @@ export function middleware(request: NextRequest) {
   if (
     publicPaths.some((p) => pathname === p || pathname.startsWith(p + "/")) ||
     pathname.startsWith("/_next") ||
+    pathname.startsWith("/api/auth/") ||
+    pathname.startsWith("/api/payments/webhook") ||
     pathname.startsWith("/api/affiliates/track") ||
     pathname.includes(".")
   ) {

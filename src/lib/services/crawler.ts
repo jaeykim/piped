@@ -12,6 +12,7 @@ export interface PageData {
   bodyText: string;
   images: { src: string; alt: string }[];
   colors: string[];
+  logoUrl?: string;
 }
 
 export interface CrawlResult {
@@ -28,6 +29,7 @@ export interface CrawlResult {
   images: { src: string; alt: string }[];
   links: string[];
   colors: string[];
+  logoUrl?: string;
   subPages: PageData[];
 }
 
@@ -100,6 +102,25 @@ function parsePage(html: string, pageUrl: string): PageData & { internalLinks: s
     }
   });
 
+  // Extract logo/favicon
+  const logoSelectors = [
+    'link[rel="icon"]',
+    'link[rel="shortcut icon"]',
+    'link[rel="apple-touch-icon"]',
+    'link[rel="apple-touch-icon-precomposed"]',
+    'meta[property="og:image"]',
+  ];
+  let logoUrl: string | undefined;
+  for (const sel of logoSelectors) {
+    const val = $(sel).attr("href") || $(sel).attr("content");
+    if (val) {
+      try {
+        logoUrl = val.startsWith("http") ? val : new URL(val, pageUrl).href;
+        break;
+      } catch { /* skip */ }
+    }
+  }
+
   const colorRegex = /#[0-9a-fA-F]{3,8}|rgb\([^)]+\)|rgba\([^)]+\)/g;
   const styleText = $("style").text() + $("[style]").text();
   const colors = [...new Set(styleText.match(colorRegex) || [])].slice(0, 10);
@@ -116,6 +137,7 @@ function parsePage(html: string, pageUrl: string): PageData & { internalLinks: s
     bodyText,
     images: images.slice(0, 10),
     colors,
+    logoUrl,
     internalLinks: [...new Set(internalLinks)],
   };
 }
@@ -187,6 +209,7 @@ export async function crawlUrl(url: string): Promise<CrawlResult> {
     images: allImages,
     links: mainData.internalLinks.slice(0, 50),
     colors: allColors,
+    logoUrl: mainData.logoUrl,
     subPages,
   };
 }

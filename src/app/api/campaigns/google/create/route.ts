@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { createGoogleCampaign } from "@/lib/services/google-ads";
+import { refreshGoogleAccessToken } from "@/lib/services/google-auth";
 import { FieldValue } from "firebase-admin/firestore";
 
 export async function POST(request: NextRequest) {
@@ -31,7 +32,14 @@ export async function POST(request: NextRequest) {
 
     if (!googleIntegration?.refreshToken) {
       return NextResponse.json(
-        { error: "Google Ads account not connected" },
+        { error: "Google Ads 계정이 연결되지 않았습니다. Settings에서 연결하세요." },
+        { status: 400 }
+      );
+    }
+
+    if (!googleIntegration.customerId) {
+      return NextResponse.json(
+        { error: "Google Ads Customer ID가 없습니다. 계정을 다시 연결하세요." },
         { status: 400 }
       );
     }
@@ -44,9 +52,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get fresh access token from refresh token
+    const accessToken = await refreshGoogleAccessToken(
+      googleIntegration.refreshToken
+    );
+
     const result = await createGoogleCampaign({
       customerId: googleIntegration.customerId,
-      accessToken: googleIntegration.refreshToken,
+      accessToken,
       developerToken,
       name,
       dailyBudget,

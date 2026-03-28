@@ -23,7 +23,7 @@ import type { AffiliateProgram } from "@/types/affiliate";
 export default function ProgramDetailPage() {
   const params = useParams();
   const programId = params.programId as string;
-  const { profile } = useAuth();
+  const { profile, activeRole } = useAuth();
   const { toast } = useToast();
 
   const [program, setProgram] = useState<AffiliateProgram | null>(null);
@@ -175,12 +175,12 @@ export default function ProgramDetailPage() {
               loading={joining}
               className="w-full"
               size="lg"
-              disabled={profile?.role !== "influencer"}
+              disabled={activeRole !== "influencer"}
             >
               <LinkIcon className="mr-2 h-4 w-4" />
-              {profile?.role === "influencer"
+              {activeRole === "influencer"
                 ? "Join Program"
-                : "Switch to Influencer account to join"}
+                : "Influencer 모드로 전환하여 참여하세요"}
             </Button>
           )}
         </CardContent>
