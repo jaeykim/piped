@@ -166,20 +166,6 @@ export async function POST(request: NextRequest) {
         tags: autoTags.length > 0 ? autoTags : undefined,
       };
 
-      // Step 1: Generate the text card (gradient background + text)
-      const card = await generateGraphicCard(cardConfig);
-
-      const cardConfig = {
-        headline: copyTrio.headline || finalOverlay,
-        subheadline: copyTrio.subheadline,
-        cta: copyTrio.cta || "자세히 보기 →",
-        productName: analysis.productName,
-        brandColor: analysis.brandColors[0] || "#4F46E5",
-        size,
-        style: cardStyle,
-        tags: autoTags.length > 0 ? autoTags : undefined,
-      };
-
       let cardData: string;
 
       // Step 2: Generate illustration with Imagen → sandwich between bg and text
