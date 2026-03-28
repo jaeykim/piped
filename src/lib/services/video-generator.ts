@@ -45,8 +45,7 @@ export async function generateVideoFromImage(
     await sleep(5000); // poll every 5 seconds
     // Re-fetch operation status
     if (result.name) {
-      const status = await ai.operations.get({ operation: result.name });
-      result = status as typeof operation;
+      result = await ai.operations.getVideosOperation({ operation: result });
     }
   }
 
