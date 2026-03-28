@@ -892,6 +892,7 @@ export default function CreativesPage() {
                         productName: creative.productName,
                         brandColor: creative.brandColor,
                         size: fmt.size,
+                        isComplete: true,
                       })}
                     />
                   ) : (

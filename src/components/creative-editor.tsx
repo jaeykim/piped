@@ -12,6 +12,7 @@ export interface CreativeEditorData {
   productName: string;
   brandColor: string;
   size: string;
+  isComplete?: boolean; // graphic card — text already baked in
 }
 
 interface TextLayer {
@@ -78,12 +79,13 @@ export function CreativeEditor({ data, onClose }: Props) {
   const [saturation, setSaturation] = useState(100);
   const [overlayOpacity, setOverlayOpacity] = useState(40);
 
-  // Text layers
+  // Text layers — hidden by default for graphic cards (text already baked in)
+  const showText = !data.isComplete;
   const [layers, setLayers] = useState<TextLayer[]>([
-    { id: "headline", label: "헤드라인", text: data.hookText, visible: true, x: 7, y: 5, fontSize: 100 },
-    { id: "sub", label: "서브 텍스트", text: data.subheadline || "", visible: !!(data.subheadline), x: 7, y: 40, fontSize: 100 },
-    { id: "cta", label: "CTA 버튼", text: data.cta || "", visible: !!(data.cta), x: 30, y: 85, fontSize: 100 },
-    { id: "brand", label: "브랜드", text: data.productName, visible: true, x: 7, y: 92, fontSize: 100 },
+    { id: "headline", label: "헤드라인", text: data.hookText, visible: showText, x: 7, y: 5, fontSize: 100 },
+    { id: "sub", label: "서브 텍스트", text: data.subheadline || "", visible: showText && !!(data.subheadline), x: 7, y: 40, fontSize: 100 },
+    { id: "cta", label: "CTA 버튼", text: data.cta || "", visible: showText && !!(data.cta), x: 30, y: 85, fontSize: 100 },
+    { id: "brand", label: "브랜드", text: data.productName, visible: showText, x: 7, y: 92, fontSize: 100 },
   ]);
 
   useEffect(() => {
@@ -264,10 +266,10 @@ export function CreativeEditor({ data, onClose }: Props) {
 
   const handleReset = () => {
     setLayers([
-      { id: "headline", label: "헤드라인", text: data.hookText, visible: true, x: 7, y: 5, fontSize: 100 },
-      { id: "sub", label: "서브 텍스트", text: data.subheadline || "", visible: !!(data.subheadline), x: 7, y: 40, fontSize: 100 },
-      { id: "cta", label: "CTA 버튼", text: data.cta || "", visible: !!(data.cta), x: 30, y: 85, fontSize: 100 },
-      { id: "brand", label: "브랜드", text: data.productName, visible: true, x: 7, y: 92, fontSize: 100 },
+      { id: "headline", label: "헤드라인", text: data.hookText, visible: showText, x: 7, y: 5, fontSize: 100 },
+      { id: "sub", label: "서브 텍스트", text: data.subheadline || "", visible: showText && !!(data.subheadline), x: 7, y: 40, fontSize: 100 },
+      { id: "cta", label: "CTA 버튼", text: data.cta || "", visible: showText && !!(data.cta), x: 30, y: 85, fontSize: 100 },
+      { id: "brand", label: "브랜드", text: data.productName, visible: showText, x: 7, y: 92, fontSize: 100 },
     ]);
     setBrightness(100); setContrast(100); setSaturation(100); setOverlayOpacity(40);
   };
