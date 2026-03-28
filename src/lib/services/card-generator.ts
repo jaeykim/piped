@@ -4,6 +4,16 @@
  */
 
 import sharp from "sharp";
+import path from "path";
+
+// Ensure fontconfig can find our bundled Korean fonts (Noto Sans KR)
+const fontsDir = path.join(process.cwd(), "fonts");
+if (!process.env.FONTCONFIG_PATH) {
+  process.env.FONTCONFIG_PATH = fontsDir;
+}
+if (!process.env.FONTCONFIG_FILE) {
+  process.env.FONTCONFIG_FILE = path.join(fontsDir, "fonts.conf");
+}
 
 export interface CardConfig {
   headline: string;
@@ -150,7 +160,7 @@ function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: nu
     const bH = bSize * 2;
     badgeSvgTop = `
       <rect x="${pad}" y="${y}" width="${bW}" height="${bH}" rx="${bH / 2}" fill="rgb(${r},${g},${b})"/>
-      <text x="${pad + bPad}" y="${y + bH / 2 + bSize * 0.35}" font-family="Noto Sans CJK KR, Noto Sans KR, Noto Sans, Arial, sans-serif" font-weight="700" font-size="${bSize}" fill="#FFFFFF">${esc(config.badge)}</text>`;
+      <text x="${pad + bPad}" y="${y + bH / 2 + bSize * 0.35}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="700" font-size="${bSize}" fill="#FFFFFF">${esc(config.badge)}</text>`;
     y += bH + ref * 0.015;
   }
 
@@ -181,7 +191,7 @@ function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: nu
       }
     }
 
-    return `${highlightSvg}<text x="${pad}" y="${ly}" font-family="Noto Sans CJK KR, Noto Sans KR, Noto Sans, Arial, sans-serif" font-weight="900" font-size="${headSize}" fill="${textColor}" letter-spacing="-0.01em">${esc(line)}</text>`;
+    return `${highlightSvg}<text x="${pad}" y="${ly}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="900" font-size="${headSize}" fill="${textColor}" letter-spacing="-0.01em">${esc(line)}</text>`;
   }).join("");
   y += headLines.length * lineH + headSize * 0.2;
 
@@ -194,7 +204,7 @@ function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: nu
   if (config.subheadline) {
     const subLines = wrapText(config.subheadline, subSize, maxTextW);
     subSvg = subLines.slice(0, 3).map((line, i) => {
-      return `<text x="${pad}" y="${y + subSize + i * (subSize * 1.4)}" font-family="Noto Sans CJK KR, Noto Sans KR, Noto Sans, Arial, sans-serif" font-weight="500" font-size="${subSize}" fill="${subColor}">${esc(line)}</text>`;
+      return `<text x="${pad}" y="${y + subSize + i * (subSize * 1.4)}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="500" font-size="${subSize}" fill="${subColor}">${esc(line)}</text>`;
     }).join("");
     y += subLines.slice(0, 3).length * (subSize * 1.4) + subSize * 0.3;
   }
@@ -213,7 +223,7 @@ function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: nu
       const tw = tag.length * tagSize * 0.75 + tagPad * 2;
       if (tx + tw > w - pad) { tx = pad; y += tagH + tagGap; }
       tagsSvg += `<rect x="${tx}" y="${y}" width="${tw}" height="${tagH}" rx="${tagH / 2}" fill="${tagBg}"/>
-        <text x="${tx + tagPad}" y="${y + tagH / 2 + tagSize * 0.35}" font-family="Noto Sans CJK KR, Noto Sans KR, Noto Sans, Arial, sans-serif" font-weight="600" font-size="${tagSize}" fill="${tagText}">${esc(tag)}</text>`;
+        <text x="${tx + tagPad}" y="${y + tagH / 2 + tagSize * 0.35}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="600" font-size="${tagSize}" fill="${tagText}">${esc(tag)}</text>`;
       tx += tw + tagGap;
     }
     y += tagH + ref * 0.015;
@@ -226,7 +236,7 @@ function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: nu
     const ctaW = config.cta.length * ctaSize * 0.85 + ctaSize * 4;
     const ctaH = ctaSize * 2.8;
     ctaSvg = `<rect x="${pad}" y="${y}" width="${ctaW}" height="${ctaH}" rx="${ctaH / 2}" fill="rgb(${r},${g},${b})"/>
-      <text x="${pad + ctaW / 2}" y="${y + ctaH / 2 + ctaSize * 0.35}" font-family="Noto Sans CJK KR, Noto Sans KR, Noto Sans, Arial, sans-serif" font-weight="700" font-size="${ctaSize}" fill="#FFFFFF" text-anchor="middle">${esc(config.cta)}</text>`;
+      <text x="${pad + ctaW / 2}" y="${y + ctaH / 2 + ctaSize * 0.35}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="700" font-size="${ctaSize}" fill="#FFFFFF" text-anchor="middle">${esc(config.cta)}</text>`;
   }
 
   // Brand badge — bottom right
@@ -235,7 +245,7 @@ function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: nu
   const bx = w - pad - bw;
   const by = h - pad - bh;
   const brandSvg = `<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="${bh / 2}" fill="${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)"}"/>
-    <text x="${bx + 8}" y="${by + bh / 2 + badgeSize * 0.35}" font-family="Noto Sans CJK KR, Noto Sans KR, Noto Sans, Arial, sans-serif" font-weight="600" font-size="${badgeSize}" fill="${isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.35)"}">${esc(config.productName)}</text>`;
+    <text x="${bx + 8}" y="${by + bh / 2 + badgeSize * 0.35}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="600" font-size="${badgeSize}" fill="${isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.35)"}">${esc(config.productName)}</text>`;
 
   return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
     ${badgeSvgTop}${headSvg}${accent}${subSvg}${tagsSvg}${ctaSvg}${brandSvg}
