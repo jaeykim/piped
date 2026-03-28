@@ -72,6 +72,7 @@ export function CreativeEditor({ data, onClose }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [baseImg, setBaseImg] = useState<HTMLImageElement | null>(null);
   const [draggingLayer, setDraggingLayer] = useState<string | null>(null);
+  const dragOffsetRef = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
 
   // Image adjustments
   const [brightness, setBrightness] = useState(100);
@@ -228,14 +229,19 @@ export function CreativeEditor({ data, onClose }: Props) {
     const my = (e.clientY - rect.top) * scaleY;
 
     // Find which layer was clicked (reverse order = top layer first)
+    const mxPct = (mx / w) * 100;
+    const myPct = (my / h) * 100;
+
     for (let i = layers.length - 1; i >= 0; i--) {
       const l = layers[i];
       if (!l.visible) continue;
       const lx = (l.x / 100) * w;
       const ly = (l.y / 100) * h;
-      const hitW = w * 0.5;
-      const hitH = w * 0.1;
+      const hitW = w * 0.6;
+      const hitH = w * 0.12;
       if (mx >= lx - 10 && mx <= lx + hitW && my >= ly - 10 && my <= ly + hitH) {
+        // Store offset between click point and layer origin
+        dragOffsetRef.current = { dx: mxPct - l.x, dy: myPct - l.y };
         setDraggingLayer(l.id);
         return;
       }
@@ -247,10 +253,12 @@ export function CreativeEditor({ data, onClose }: Props) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const [w, h] = data.size.split("x").map(Number);
     const px = ((e.clientX - rect.left) / rect.width) * 100;
     const py = ((e.clientY - rect.top) / rect.height) * 100;
-    updateLayer(draggingLayer, { x: Math.max(2, Math.min(80, px)), y: Math.max(2, Math.min(95, py)) });
+    // Apply offset so the layer stays at the same relative position to the cursor
+    const newX = px - dragOffsetRef.current.dx;
+    const newY = py - dragOffsetRef.current.dy;
+    updateLayer(draggingLayer, { x: Math.max(0, Math.min(90, newX)), y: Math.max(0, Math.min(95, newY)) });
   };
 
   const handleCanvasMouseUp = () => { setDraggingLayer(null); };

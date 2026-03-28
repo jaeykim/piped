@@ -168,57 +168,73 @@ export async function POST(request: NextRequest) {
 
       let cardData: string;
 
-      // Step 2: Generate illustration with Imagen → sandwich between bg and text
+      // Step 2: Try to add website screenshot as a device mockup
       try {
         const [cw, ch] = (size as string).split("x").map(Number);
-        const illustSize = Math.round(cw * 0.38);
+        let screenshotBuffer: Buffer | null = null;
 
-        const Anthropic = (await import("@anthropic-ai/sdk")).default;
-        const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-        const illustBrief = await claude.messages.create({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 200,
-          system: "You write SHORT image prompts for Imagen 4. One sentence. Single subject, white background, photorealistic.",
-          messages: [{
-            role: "user",
-            content: `Product: ${analysis.productName}
-What it does: ${analysis.valueProposition}
-Features: ${analysis.keyFeatures.slice(0, 3).join(", ")}
-Industry: ${analysis.industry}
-
-Write a 1-sentence prompt for an image representing this product's core benefit. Be SPECIFIC to "${analysis.productName}". White background, single subject, no text.`,
-          }],
-        });
-
-        const illustPrompt = (illustBrief.content[0].type === "text" ? illustBrief.content[0].text : "").trim();
-
-        if (illustPrompt) {
-          const illustRes = await ai.models.generateImages({
-            model: "imagen-4.0-generate-001",
-            prompt: illustPrompt.includes("no text") ? illustPrompt : illustPrompt + " White background, no text.",
-            config: { numberOfImages: 1, aspectRatio: "1:1" },
-          });
-
-          const imgBytes = illustRes.generatedImages?.[0]?.image?.imageBytes;
-          if (imgBytes) {
-            // Use generateCardWithImage: bg → image → text (correct layer order)
-            const imgBuffer = Buffer.from(imgBytes, "base64");
-            const composited = await generateCardWithImage(cardConfig, imgBuffer, {
-              top: ch - illustSize - Math.round(ch * 0.08),
-              left: cw - illustSize - Math.round(cw * 0.03),
-              width: illustSize,
-              height: illustSize,
-            });
-            cardData = composited.data;
-          } else {
-            cardData = (await generateGraphicCard(cardConfig)).data;
+        // Fetch real website screenshot
+        if (websiteUrl) {
+          const ssRes = await fetch(
+            `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(websiteUrl)}&category=PERFORMANCE&strategy=DESKTOP`,
+            { signal: AbortSignal.timeout(12000) }
+          );
+          if (ssRes.ok) {
+            const ssJson = await ssRes.json();
+            const dataUri = ssJson?.lighthouseResult?.audits?.["final-screenshot"]?.details?.data;
+            if (dataUri && typeof dataUri === "string") {
+              screenshotBuffer = Buffer.from(dataUri.split(",")[1], "base64");
+            }
           }
+        }
+        // Fallback to ogImage
+        if (!screenshotBuffer && analysis.screenshots?.[0]) {
+          const ogRes = await fetch(analysis.screenshots[0], { signal: AbortSignal.timeout(5000) });
+          if (ogRes.ok) {
+            const ogMime = (ogRes.headers.get("content-type") || "").split(";")[0];
+            if (!ogMime.includes("svg")) {
+              screenshotBuffer = Buffer.from(await ogRes.arrayBuffer());
+            }
+          }
+        }
+
+        if (screenshotBuffer) {
+          // Create a device mockup from the screenshot
+          const mockW = Math.round(cw * 0.4);
+          const mockH = Math.round(mockW * 0.62);
+          const mockX = cw - mockW - Math.round(cw * 0.04);
+          const mockY = ch - mockH - Math.round(ch * 0.1);
+
+          // Resize screenshot to fit mockup, add rounded corners via SVG mask
+          const ssResized = await sharp(screenshotBuffer)
+            .resize(mockW - 12, mockH - 12, { fit: "cover" })
+            .png()
+            .toBuffer();
+
+          // Create frame with rounded corners + shadow
+          const frameSvg = `<svg width="${mockW}" height="${mockH}" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <filter id="sh" x="-8%" y="-8%" width="120%" height="120%">
+                <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="rgba(0,0,0,0.2)"/>
+              </filter>
+            </defs>
+            <rect x="2" y="2" width="${mockW - 4}" height="${mockH - 4}" rx="8" fill="white" filter="url(#sh)"/>
+          </svg>`;
+          const frame = await sharp(Buffer.from(frameSvg)).png().toBuffer();
+          const mockup = await sharp(frame)
+            .composite([{ input: ssResized, top: 6, left: 6 }])
+            .png()
+            .toBuffer();
+
+          const composited = await generateCardWithImage(cardConfig, mockup, {
+            top: mockY, left: mockX, width: mockW, height: mockH,
+          });
+          cardData = composited.data;
         } else {
           cardData = (await generateGraphicCard(cardConfig)).data;
         }
       } catch (e) {
-        console.error("Illustration failed, using plain card:", e);
+        console.error("Screenshot mockup failed:", e);
         cardData = (await generateGraphicCard(cardConfig)).data;
       }
 
