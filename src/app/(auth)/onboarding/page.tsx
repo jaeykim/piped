@@ -1,0 +1,108 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { FolderKanban, Users, Zap } from "lucide-react";
+import { useAuth } from "@/context/auth-context";
+import { createUserProfile } from "@/lib/firebase/auth";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
+import type { UserRole } from "@/types/user";
+
+export default function OnboardingPage() {
+  const [selected, setSelected] = useState<UserRole | null>(null);
+  const [loading, setLoading] = useState(false);
+  const { user, refreshProfile } = useAuth();
+  const router = useRouter();
+  const { toast } = useToast();
+
+  const handleContinue = async () => {
+    if (!user || !selected) return;
+    setLoading(true);
+    try {
+      await createUserProfile(user, selected);
+      await refreshProfile();
+      router.push("/dashboard");
+    } catch (err) {
+      console.error("Onboarding error:", err);
+      toast("error", err instanceof Error ? err.message : "Failed to set up profile");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const roles = [
+    {
+      id: "owner" as UserRole,
+      icon: FolderKanban,
+      title: "Product Owner",
+      desc: "I built a product and want to automate marketing with AI-generated copy, creatives, and ad campaigns.",
+    },
+    {
+      id: "influencer" as UserRole,
+      icon: Users,
+      title: "Influencer",
+      desc: "I want to discover great products, promote them to my audience, and earn commissions through affiliate links.",
+    },
+  ];
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-2">
+        <Zap className="h-5 w-5 text-indigo-600" />
+        <span className="text-sm font-medium text-indigo-600">
+          One more step
+        </span>
+      </div>
+      <h1 className="text-2xl font-bold text-gray-900">How will you use Piped?</h1>
+      <p className="mt-2 text-sm text-gray-600">
+        Choose your role to personalize your experience.
+      </p>
+
+      <div className="mt-6 space-y-3">
+        {roles.map((role) => {
+          const Icon = role.icon;
+          const isSelected = selected === role.id;
+          return (
+            <button
+              key={role.id}
+              onClick={() => setSelected(role.id)}
+              className={`w-full rounded-xl border-2 p-4 text-left transition-all ${
+                isSelected
+                  ? "border-indigo-600 bg-indigo-50"
+                  : "border-gray-200 hover:border-gray-300"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+                    isSelected ? "bg-indigo-600" : "bg-gray-100"
+                  }`}
+                >
+                  <Icon
+                    className={`h-5 w-5 ${
+                      isSelected ? "text-white" : "text-gray-600"
+                    }`}
+                  />
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900">{role.title}</p>
+                  <p className="mt-1 text-sm text-gray-600">{role.desc}</p>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <Button
+        onClick={handleContinue}
+        loading={loading}
+        disabled={!selected}
+        className="mt-6 w-full"
+      >
+        Continue
+      </Button>
+    </div>
+  );
+}
