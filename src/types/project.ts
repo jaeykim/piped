@@ -1,5 +1,6 @@
 export type ProjectStatus = "crawling" | "analyzed" | "generating" | "ready" | "error";
 export type PipelineStage = "analysis" | "copy" | "creatives" | "campaigns" | "affiliates";
+export type CampaignType = "influencer" | "meta" | "google";
 
 export interface Project {
   id: string;
@@ -8,6 +9,7 @@ export interface Project {
   name: string;
   status: ProjectStatus;
   pipelineStage: PipelineStage;
+  campaignType?: CampaignType;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -1,7 +1,15 @@
 import type { CrawlResult } from "@/lib/services/crawler";
 
-export function buildAnalysisPrompt(crawl: CrawlResult) {
-  const systemPrompt = `You are a marketing strategist and brand analyst. Analyze the website data provided and extract key marketing insights. Return ONLY valid JSON with no markdown formatting.`;
+const LOCALE_NAMES: Record<string, string> = {
+  ko: "Korean",
+  ja: "Japanese",
+  zh: "Chinese",
+  en: "English",
+};
+
+export function buildAnalysisPrompt(crawl: CrawlResult, locale?: string) {
+  const lang = LOCALE_NAMES[locale?.split("-")[0] || ""] || "English";
+  const systemPrompt = `You are a marketing strategist and brand analyst. Analyze the website data provided and extract key marketing insights. Return ONLY valid JSON with no markdown formatting. ALL text values in the JSON (productName, valueProposition, targetAudience, keyFeatures, tone, industry, summary) MUST be written in ${lang}.`;
 
   const subPagesSection =
     crawl.subPages && crawl.subPages.length > 0

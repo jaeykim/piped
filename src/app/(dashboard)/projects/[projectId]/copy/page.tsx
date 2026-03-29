@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore";
 import { getDb, getAuth_ } from "@/lib/firebase/client";
 import { useAuth } from "@/context/auth-context";
+import { useLocale } from "@/context/locale-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs } from "@/components/ui/tabs";
@@ -61,15 +62,6 @@ const COUNTRIES = [
   { code: "GLOBAL", label: "글로벌 (전체)", flag: "🌏" },
 ];
 
-const typeLabels: Record<CopyType, string> = {
-  headline: "Headlines",
-  description_short: "Short Descriptions",
-  description_long: "Long Descriptions",
-  ad_meta: "Meta Ads",
-  ad_google: "Google Ads",
-  social: "Social Posts",
-  cta: "CTAs",
-};
 
 function CopyCard({
   variant,
@@ -86,6 +78,7 @@ function CopyCard({
   );
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
+  const { t } = useLocale();
 
   const isAdCopy = variant.type === "ad_meta" || variant.type === "ad_google";
   const displayContent = variant.editedContent || variant.content;
@@ -120,7 +113,7 @@ function CopyCard({
     );
     setEditing(false);
     onUpdate();
-    toast("success", "Copy updated");
+    toast("success", t.copy.copyUpdated);
   };
 
   return (
@@ -137,7 +130,7 @@ function CopyCard({
             <div className="flex gap-2">
               <Button size="sm" onClick={handleSaveEdit}>
                 <Check className="mr-1 h-3 w-3" />
-                Save
+                {t.copy.save}
               </Button>
               <Button
                 size="sm"
@@ -145,7 +138,7 @@ function CopyCard({
                 onClick={() => setEditing(false)}
               >
                 <X className="mr-1 h-3 w-3" />
-                Cancel
+                {t.copy.cancel}
               </Button>
             </div>
           </div>
@@ -167,7 +160,7 @@ function CopyCard({
             )}
             {variant.isEdited && (
               <Badge variant="info" className="mt-2">
-                Edited
+                {t.copy.edited}
               </Badge>
             )}
             <div className="mt-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -221,6 +214,17 @@ export default function CopyPage() {
   const [selectedCountry, setSelectedCountry] = useState("KR");
   const { toast } = useToast();
   const { refreshProfile } = useAuth();
+  const { t } = useLocale();
+
+  const typeLabels: Record<CopyType, string> = {
+    headline: t.copy.headlines,
+    description_short: t.copy.shortDesc,
+    description_long: t.copy.longDesc,
+    ad_meta: t.copy.metaAds,
+    ad_google: t.copy.googleAds,
+    social: t.copy.socialPosts,
+    cta: t.copy.ctas,
+  };
 
   const loadVariants = useCallback(async () => {
     const q = query(
@@ -260,13 +264,13 @@ export default function CopyPage() {
         const data = await res.json();
         throw new Error(data.error);
       }
-      toast("success", "마케팅 문구가 생성되었습니다!");
+      toast("success", t.copy.generated);
       await loadVariants();
       refreshProfile(); // Update credit balance
     } catch (error) {
       toast(
         "error",
-        error instanceof Error ? error.message : "Generation failed"
+        error instanceof Error ? error.message : t.common.error
       );
     } finally {
       setGenerating(false);
@@ -285,14 +289,14 @@ export default function CopyPage() {
   if (variants.length === 0 && !generating) {
     return (
       <div className="mx-auto max-w-4xl">
-        <h1 className="text-2xl font-bold text-gray-900">Marketing Copy</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t.copy.title}</h1>
         <p className="mt-1 text-sm text-gray-500">
-          대상 국가와 언어를 선택하면 바로 마케팅 문구를 생성합니다
+          {t.copy.subtitle}
         </p>
 
         {/* Target Country */}
         <div className="mt-8">
-          <h2 className="text-sm font-medium text-gray-700">대상 국가</h2>
+          <h2 className="text-sm font-medium text-gray-700">{t.copy.selectCountry}</h2>
           <div className="mt-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {COUNTRIES.map((c) => (
               <button
@@ -316,7 +320,7 @@ export default function CopyPage() {
 
         {/* Language */}
         <div className="mt-8">
-          <h2 className="text-sm font-medium text-gray-700">광고 언어</h2>
+          <h2 className="text-sm font-medium text-gray-700">{t.copy.selectLanguage}</h2>
           <div className="mt-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
             {LANGUAGES.map((l) => (
               <button
@@ -338,7 +342,7 @@ export default function CopyPage() {
         <div className="mt-8 flex justify-end">
           <Button onClick={handleGenerate} size="lg">
             <Sparkles className="mr-2 h-4 w-4" />
-            마케팅 문구 생성하기 (10 크레딧)
+            {t.copy.generateButton} (10 {t.common.credits})
           </Button>
         </div>
       </div>
@@ -349,18 +353,18 @@ export default function CopyPage() {
   if (generating) {
     return (
       <div className="mx-auto max-w-2xl">
-        <h1 className="text-2xl font-bold text-gray-900">Marketing Copy</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t.copy.title}</h1>
         <Card className="mt-8">
           <CardContent className="py-16 text-center">
             <Spinner size="lg" />
             <p className="mt-4 text-lg font-medium text-gray-900">
-              마케팅 문구 생성 중...
+              {t.copy.generating}
             </p>
             <p className="mt-1 text-sm text-gray-500">
-              Headlines, Descriptions, Ad Copy, Social Posts를 생성하고 있습니다
+              {t.copy.generatingDesc}
             </p>
             <div className="mt-6 space-y-2">
-              {["Headlines 생성중", "Descriptions 생성중", "Ad Copy 생성중", "Social Posts 생성중"].map(
+              {[t.copy.generatingHeadlines, t.copy.generatingDescs, t.copy.generatingAdCopy, t.copy.generatingSocial].map(
                 (step, i) => (
                   <div
                     key={i}
@@ -404,14 +408,14 @@ export default function CopyPage() {
   return (
     <div className="mx-auto max-w-3xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Marketing Copy</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t.copy.title}</h1>
         <Button
           variant="outline"
           onClick={handleGenerate}
           loading={generating}
         >
           <RefreshCw className="mr-2 h-4 w-4" />
-          Regenerate All
+          {t.copy.regenerateAll}
         </Button>
       </div>
       <div className="mt-6">
@@ -426,16 +430,16 @@ export default function CopyPage() {
           </div>
           <div>
             <p className="font-medium text-gray-900">
-              Next: Generate Ad Creatives
+              {t.copy.nextCreatives}
             </p>
             <p className="text-sm text-gray-500">
-              Create stunning visuals powered by AI
+              {t.copy.nextCreativesDesc}
             </p>
           </div>
         </div>
         <Link href={`/projects/${projectId}/creatives`}>
           <Button>
-            Continue
+            {t.copy.continue}
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </Link>

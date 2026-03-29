@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebase/admin";
 
 const CREDIT_PACKS: Record<string, { credits: number; amount: number }> = {
-  starter: { credits: 100, amount: 10 },
-  growth: { credits: 500, amount: 40 },
-  pro: { credits: 1000, amount: 70 },
+  starter: { credits: 100, amount: 9.5 },
+  growth: { credits: 500, amount: 38 },
+  pro: { credits: 1000, amount: 66.5 },
 };
 
 // Default tokens per chain (USDC)

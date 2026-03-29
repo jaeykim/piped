@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { collection, getDocs, doc, getDoc, query, orderBy } from "firebase/firestore";
 import { getDb, getAuth_ } from "@/lib/firebase/client";
 import { useAuth } from "@/context/auth-context";
+import { useLocale } from "@/context/locale-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -106,6 +107,8 @@ export default function CreativesPage() {
   const projectId = params.projectId as string;
   const { toast } = useToast();
   const { refreshProfile } = useAuth();
+  const { t, locale } = useLocale();
+  const isKo = locale.startsWith("ko");
 
   // Recommendation state
   interface Recommendation { concept: CreativeConcept; subject: CreativeSubject; reason: string }
@@ -132,6 +135,7 @@ export default function CreativesPage() {
   const [editingCreative, setEditingCreative] = useState<CreativeEditorData | null>(null);
   const [generatingVideo, setGeneratingVideo] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [hasCampaigns, setHasCampaigns] = useState(false);
 
   // Load project settings (language/country from copy step)
   useEffect(() => {
@@ -145,6 +149,11 @@ export default function CreativesPage() {
       if (data?.country) {
         const match = COUNTRIES.find((c) => c.label === data.country);
         if (match) setSelectedCountry(match.code);
+      }
+      // Check if already past creatives stage
+      const stage = data?.pipelineStage;
+      if (stage === "campaigns" || stage === "affiliates") {
+        setHasCampaigns(true);
       }
     }
     loadProjectSettings();
@@ -1014,27 +1023,51 @@ export default function CreativesPage() {
           )}
 
           {/* Next Step */}
-          <div className="mt-8 rounded-xl border border-orange-200 bg-orange-50 p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100">
-                <Megaphone className="h-5 w-5 text-orange-600" />
+          {hasCampaigns ? (
+            <div className="mt-8 rounded-xl border border-indigo-200 bg-indigo-50 p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100">
+                  <ArrowRight className="h-5 w-5 text-indigo-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">
+                    {t.creatives.allGenerated}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    {isKo ? "크리에이티브가 업데이트되었습니다. 프로젝트로 돌아갑니다." : "Creatives updated. Return to your project."}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium text-gray-900">
-                  Next: Launch Campaigns
-                </p>
-                <p className="text-sm text-gray-500">
-                  Set up ad campaigns on Meta or Google Ads
-                </p>
-              </div>
+              <Link href={`/projects/${projectId}`}>
+                <Button>
+                  {isKo ? "프로젝트로 돌아가기" : "Back to Project"}
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
             </div>
-            <Link href={`/projects/${projectId}/campaigns/new`}>
-              <Button>
-                Continue
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
+          ) : (
+            <div className="mt-8 rounded-xl border border-orange-200 bg-orange-50 p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100">
+                  <Megaphone className="h-5 w-5 text-orange-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">
+                    {t.creatives.nextCampaigns}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    {t.creatives.nextCampaignsDesc}
+                  </p>
+                </div>
+              </div>
+              <Link href={`/projects/${projectId}/campaigns/new`}>
+                <Button>
+                  {t.common.continue}
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          )}
         </>
       )}
 

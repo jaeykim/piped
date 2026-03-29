@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { url, projectId } = body;
+    const { url, projectId, locale } = body;
 
     if (!url || !projectId) {
       return NextResponse.json(
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     const crawlResult = await crawlUrl(url);
 
     // Analyze with Claude
-    const analysis = await analyzeWebsite(crawlResult);
+    const analysis = await analyzeWebsite(crawlResult, locale);
 
     // Save analysis to Firestore
     await adminDb.doc(`projects/${projectId}/analysis/result`).set({

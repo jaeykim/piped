@@ -10,7 +10,7 @@ interface TopbarProps {
 }
 
 export function Topbar({ onMenuClick, title }: TopbarProps) {
-  const { profile, activeRole } = useAuth();
+  const { profile } = useAuth();
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-gray-100 bg-white/80 backdrop-blur-sm px-6">
@@ -24,13 +24,13 @@ export function Topbar({ onMenuClick, title }: TopbarProps) {
         {title && <h1 className="text-lg font-semibold text-gray-900">{title}</h1>}
       </div>
 
-      {activeRole === "owner" && (
+      {profile?.credits !== undefined && (
         <Link
           href="/settings"
           className="flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
         >
           <Zap className="h-3.5 w-3.5" />
-          {profile?.credits ?? 0}
+          {profile.credits.toLocaleString()}
         </Link>
       )}
     </header>

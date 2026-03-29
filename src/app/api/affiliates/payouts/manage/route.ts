@@ -10,11 +10,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const token = authHeader.split("Bearer ")[1];
-    await adminAuth.verifyIdToken(token);
+    const decoded = await adminAuth.verifyIdToken(token);
+    const uid = decoded.uid;
 
     const { payoutId, action } = await request.json(); // action: "approve" | "reject" | "paid"
     if (!payoutId || !["approve", "reject", "paid"].includes(action)) {
       return NextResponse.json({ error: "payoutId and action required" }, { status: 400 });
+    }
+
+    // Verify the requester owns the program linked to this payout
+    const payoutSnap = await adminDb.doc(`payoutRequests/${payoutId}`).get();
+    if (!payoutSnap.exists) {
+      return NextResponse.json({ error: "Payout not found" }, { status: 404 });
+    }
+    const payoutData = payoutSnap.data()!;
+    if (payoutData.programId) {
+      const programSnap = await adminDb.doc(`affiliatePrograms/${payoutData.programId}`).get();
+      if (programSnap.exists && programSnap.data()?.ownerId !== uid) {
+        return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+      }
     }
 
     const statusMap: Record<string, string> = {

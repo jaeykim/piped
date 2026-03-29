@@ -77,8 +77,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `잔액이 부족합니다. 출금 가능: $${available.toFixed(2)}` }, { status: 400 });
     }
 
+    // Get programId from user's first affiliate link for attribution
+    const firstLink = linksSnap.docs[0]?.data();
     const ref = await adminDb.collection("payoutRequests").add({
       influencerId: uid,
+      programId: firstLink?.programId || "",
       amount,
       status: "pending",
       paymentMethod: paymentMethod || "bank_transfer",

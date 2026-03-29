@@ -1,9 +1,9 @@
 "use client";
 
 import { CheckCircle, Globe, PenTool, Image, Megaphone, Users } from "lucide-react";
-import type { PipelineStage } from "@/types/project";
+import type { PipelineStage, CampaignType } from "@/types/project";
 
-const stages: { id: PipelineStage; label: string; icon: typeof Globe }[] = [
+const allStages: { id: PipelineStage; label: string; icon: typeof Globe }[] = [
   { id: "analysis", label: "Analysis", icon: Globe },
   { id: "copy", label: "Copy", icon: PenTool },
   { id: "creatives", label: "Creatives", icon: Image },
@@ -13,13 +13,22 @@ const stages: { id: PipelineStage; label: string; icon: typeof Globe }[] = [
 
 interface PipelineStepperProps {
   currentStage: PipelineStage;
+  campaignType?: CampaignType;
   onStageClick?: (stage: PipelineStage) => void;
 }
 
 export function PipelineStepper({
   currentStage,
+  campaignType,
   onStageClick,
 }: PipelineStepperProps) {
+  // Filter stages based on campaign type
+  const stages = campaignType === "influencer"
+    ? allStages.filter((s) => s.id !== "campaigns")
+    : campaignType
+    ? allStages.filter((s) => s.id !== "affiliates")
+    : allStages;
+
   const currentIndex = stages.findIndex((s) => s.id === currentStage);
 
   return (

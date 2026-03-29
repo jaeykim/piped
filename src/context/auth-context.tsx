@@ -38,8 +38,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [activeRole, setActiveRole] = useState<UserRole>("owner");
   const userRef = useRef<User | null>(null);
 
-  const switchRole = useCallback((role: UserRole) => {
-    setActiveRole(role);
+  // Roles are merged — everyone is "owner". switchRole is kept for backward compatibility.
+  const switchRole = useCallback((_role: UserRole) => {
+    // no-op: roles are merged
   }, []);
 
   const refreshProfile = useCallback(async () => {
@@ -57,7 +58,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (firebaseUser) {
         const p = await getUserProfile(firebaseUser.uid);
         setProfile(p);
-        setActiveRole(p?.role || "owner");
+        // Roles merged — always "owner"
+        setActiveRole("owner");
       } else {
         setProfile(null);
       }

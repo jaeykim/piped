@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     // Calculate commission
     let commission = 0;
     if (program.commissionType === "percentage") {
-      commission = (conversionValue * program.commissionValue) / 100;
+      commission = Math.round((conversionValue * program.commissionValue) / 100 * 100) / 100;
     } else {
       commission = program.commissionValue; // fixed amount
     }

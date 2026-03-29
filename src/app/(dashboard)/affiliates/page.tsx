@@ -7,29 +7,28 @@ import { getDb, getAuth_ } from "@/lib/firebase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
-import { Users, DollarSign, Clock, ArrowRight, Zap, Share2, BarChart3 } from "lucide-react";
+import { Users, DollarSign, Clock, ArrowRight, Zap, Share2, BarChart3, Crown } from "lucide-react";
+import { useAuth } from "@/context/auth-context";
+import { useLocale } from "@/context/locale-context";
 import type { AffiliateProgram } from "@/types/affiliate";
 
 export default function BrowseProgramsPage() {
   const [programs, setPrograms] = useState<AffiliateProgram[]>([]);
   const [loading, setLoading] = useState(true);
+  const { profile } = useAuth();
+  const { locale } = useLocale();
+  const isKo = locale.startsWith("ko");
 
   useEffect(() => {
     async function load() {
-      // Always seed demo programs first
+      // Seed demo programs (also fixes ownerId on existing demos)
       try {
         const token = await getAuth_().currentUser?.getIdToken();
         if (token) {
-          const snap = await getDocs(query(
-            collection(getDb(), "affiliatePrograms"),
-            where("status", "==", "active")
-          ));
-          if (snap.empty) {
-            await fetch("/api/affiliates/seed", {
-              method: "POST",
-              headers: { Authorization: `Bearer ${token}` },
-            });
-          }
+          await fetch("/api/affiliates/seed", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+          });
         }
       } catch { /* silent */ }
 
@@ -85,15 +84,32 @@ export default function BrowseProgramsPage() {
 
       {/* Program list */}
       <div className="mt-6 space-y-4">
-        {programs.map((program) => (
-          <Link key={program.id} href={`/affiliates/${program.id}`}>
-            <Card className="transition-all hover:shadow-md hover:border-indigo-200">
+        {programs.map((program) => {
+          // Daily budget: own programs show real 0 until launched, demo programs show demo data
+          const isMine = program.ownerId === profile?.uid;
+          const demoDailyBudgets: Record<string, { dailyLimit: number; todaySpent: number }> = {
+            "demo-piped": { dailyLimit: 25, todaySpent: 18 },
+            "demo-glowbook": { dailyLimit: 40, todaySpent: 32 },
+            "demo-coderunner": { dailyLimit: 15, todaySpent: 3 },
+          };
+          const dailyBudget = isMine
+            ? { dailyLimit: 0, todaySpent: 0 }
+            : (demoDailyBudgets[program.projectId] || { dailyLimit: 20, todaySpent: 0 });
+          const { dailyLimit, todaySpent } = dailyBudget;
+          const burnPercent = dailyLimit > 0 ? Math.round((todaySpent / dailyLimit) * 100) : 0;
+          return (
+          <Link key={program.id} href={program.ownerId === profile?.uid ? `/projects/${program.projectId}/affiliates` : `/affiliates/${program.id}`}>
+            <Card className={`transition-all hover:shadow-md ${program.ownerId === profile?.uid ? "border-indigo-300 bg-indigo-50/30 hover:border-indigo-400" : "hover:border-indigo-200"}`}>
               <CardContent className="py-5">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <h3 className="font-bold text-gray-900">{program.name}</h3>
-                      <Badge variant="success">참여 가능</Badge>
+                      {program.ownerId === profile?.uid ? (
+                        <Badge variant="info"><Crown className="mr-1 h-3 w-3 inline" />내 프로그램</Badge>
+                      ) : (
+                        <Badge variant="success">참여 가능</Badge>
+                      )}
                     </div>
                     <p className="mt-1 text-sm text-gray-500">{program.description}</p>
 
@@ -109,6 +125,35 @@ export default function BrowseProgramsPage() {
                           }/월
                         </span>
                       </p>
+                    </div>
+
+                    {/* Daily budget burn rate */}
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                        <span>{isKo ? "오늘 예산 소진율" : "Today's Budget Burn"}</span>
+                        {dailyLimit > 0 ? (
+                          <span className="font-semibold text-gray-700">{burnPercent}%</span>
+                        ) : (
+                          <span className="text-gray-400">{isKo ? "미설정" : "Not set"}</span>
+                        )}
+                      </div>
+                      <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${burnPercent > 80 ? "bg-red-500" : burnPercent > 50 ? "bg-amber-500" : "bg-green-500"}`}
+                          style={{ width: `${Math.min(burnPercent, 100)}%` }}
+                        />
+                      </div>
+                      {dailyLimit > 0 ? (
+                        <p className="mt-1 text-[10px] text-gray-400">
+                          {isKo
+                            ? `오늘 $${todaySpent} / $${dailyLimit} 사용 · 자정에 초기화`
+                            : `Today $${todaySpent} / $${dailyLimit} spent · Resets at midnight`}
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-[10px] text-gray-400">
+                          {isKo ? "캠페인 시작 후 일일 예산이 표시됩니다" : "Daily budget will show after campaign launch"}
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -127,12 +172,13 @@ export default function BrowseProgramsPage() {
                 </div>
 
                 <div className="mt-3 flex items-center text-xs font-medium text-indigo-600">
-                  참여하고 레퍼럴 링크 받기 <ArrowRight className="ml-1 h-3 w-3" />
+                  {program.ownerId === profile?.uid ? "프로그램 관리하기" : "참여하고 레퍼럴 링크 받기"} <ArrowRight className="ml-1 h-3 w-3" />
                 </div>
               </CardContent>
             </Card>
           </Link>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

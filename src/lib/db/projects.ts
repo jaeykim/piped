@@ -12,15 +12,16 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { getDb } from "@/lib/firebase/client";
-import type { Project, PipelineStage, ProjectStatus } from "@/types/project";
+import type { Project, PipelineStage, ProjectStatus, CampaignType } from "@/types/project";
 import type { SiteAnalysis } from "@/types/analysis";
 
 export async function createProject(
   ownerId: string,
   url: string,
-  name: string
+  name: string,
+  campaignType?: CampaignType
 ): Promise<string> {
-  const docRef = await addDoc(collection(getDb(), "projects"), {
+  const data: Record<string, unknown> = {
     ownerId,
     url,
     name,
@@ -28,7 +29,9 @@ export async function createProject(
     pipelineStage: "analysis" as PipelineStage,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-  });
+  };
+  if (campaignType) data.campaignType = campaignType;
+  const docRef = await addDoc(collection(getDb(), "projects"), data);
   return docRef.id;
 }
 

@@ -5,18 +5,19 @@ import { useSearchParams } from "next/navigation";
 
 // Banksi pay button — dynamically imported to avoid SSR issues
 function CryptoPayButton({ amount, credits, onSuccess }: { amount: number; credits: number; onSuccess: (credits: number) => Promise<void> }) {
-  const [BanksiBtn, setBanksiBtn] = useState<React.ComponentType<Record<string, unknown>> | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [BanksiBtn, setBanksiBtn] = useState<React.ComponentType<any> | null>(null);
 
   useEffect(() => {
     import("banksi/react").then((mod) => {
-      setBanksiBtn(() => mod.BanksiPayButton);
+      setBanksiBtn(() => mod.BanksiPayButton as React.ComponentType<any>);
     }).catch(() => {});
   }, []);
 
   if (!BanksiBtn) {
     return (
-      <button disabled className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-gray-200 bg-gray-50 px-4 py-4 text-base font-semibold text-gray-400">
-        🪙 크립토 결제 로딩중...
+      <button disabled className="flex w-full items-center justify-center gap-1 rounded-xl border-2 border-gray-200 bg-gray-50 px-4 py-4 text-sm font-semibold text-gray-400">
+        🪙 로딩중...
       </button>
     );
   }
@@ -27,9 +28,9 @@ function CryptoPayButton({ amount, credits, onSuccess }: { amount: number; credi
       apiKey={process.env.NEXT_PUBLIC_BANKSI_API_KEY || ""}
       popup={true}
       onPaymentConfirmed={() => onSuccess(credits)}
-      className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-gray-200 bg-white px-4 py-4 text-base font-semibold text-gray-900 transition-all hover:border-indigo-300 hover:shadow-md cursor-pointer"
+      className="flex w-full items-center justify-center gap-1 rounded-xl border-2 border-gray-200 bg-white px-4 py-4 text-sm font-semibold text-gray-900 transition-all hover:border-indigo-300 hover:shadow-md cursor-pointer"
     >
-      🪙 크립토로 ${amount} 결제하기
+      🪙 크립토로 결제하기 <span className="ml-1 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-bold text-green-700">5% OFF</span>
     </BanksiBtn>
   );
 }
@@ -45,7 +46,7 @@ import { User, Link, Shield } from "lucide-react";
 import { useLocale } from "@/context/locale-context";
 
 export default function SettingsPage() {
-  const { profile, activeRole, refreshProfile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const { toast } = useToast();
   const { t } = useLocale();
   const searchParams = useSearchParams();
@@ -136,6 +137,9 @@ export default function SettingsPage() {
   const googleConnected = !!profile?.integrations?.google?.refreshToken;
   const [selectedPack, setSelectedPack] = useState<string>("growth");
   const [buyingPack, setBuyingPack] = useState<string | null>(null);
+  const [billingEmail, setBillingEmail] = useState(profile?.email || "");
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [agreeRefund, setAgreeRefund] = useState(false);
   const payout = (profile as unknown as Record<string, Record<string, string>>)?.payoutSettings;
   const [cryptoNetwork, setCryptoNetwork] = useState(payout?.cryptoNetwork || "ethereum");
   const [cryptoAddress, setCryptoAddress] = useState(payout?.cryptoAddress || "");
@@ -182,21 +186,20 @@ export default function SettingsPage() {
       <h1 className="text-2xl font-bold text-gray-900">{t.settings.title}</h1>
 
       {/* Credits */}
-      {activeRole === "owner" && (
         <Card className="mt-6">
           <CardHeader>
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-gray-900">크레딧</h2>
-              <div className="text-2xl font-bold text-indigo-600">{profile?.credits ?? 0}</div>
+              <div className="text-2xl font-bold text-indigo-600">{(profile?.credits ?? 0).toLocaleString()}</div>
             </div>
           </CardHeader>
           <CardContent>
             {/* Step 1: Select pack */}
             <div className="grid gap-3 sm:grid-cols-3">
               {[
-                { id: "starter", credits: 100, price: 10, perCredit: "$0.10" },
-                { id: "growth", credits: 500, price: 40, perCredit: "$0.08", popular: true },
-                { id: "pro", credits: 1000, price: 70, perCredit: "$0.07" },
+                { id: "starter", credits: 100, price: 10, cryptoPrice: 9.5, perCredit: "$0.10" },
+                { id: "growth", credits: 500, price: 40, cryptoPrice: 38, perCredit: "$0.08", popular: true },
+                { id: "pro", credits: 1000, price: 70, cryptoPrice: 66.5, perCredit: "$0.07" },
               ].map((pack) => (
                 <button
                   key={pack.id}
@@ -218,33 +221,72 @@ export default function SettingsPage() {
               ))}
             </div>
 
-            {/* Step 2: Payment buttons */}
+            {/* Step 2: Billing info */}
             <div className="mt-5 space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">영수증 이메일</label>
+                <input
+                  type="email"
+                  value={billingEmail}
+                  onChange={(e) => setBillingEmail(e.target.value)}
+                  placeholder={profile?.email || "email@example.com"}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={agreeTerms}
+                    onChange={(e) => setAgreeTerms(e.target.checked)}
+                    className="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-xs text-gray-600">
+                    <a href="/terms" target="_blank" className="font-medium text-indigo-600 underline hover:text-indigo-800">이용약관</a> 및 <a href="/privacy" target="_blank" className="font-medium text-indigo-600 underline hover:text-indigo-800">개인정보처리방침</a>에 동의합니다.
+                  </span>
+                </label>
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={agreeRefund}
+                    onChange={(e) => setAgreeRefund(e.target.checked)}
+                    className="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-xs text-gray-600">
+                    크레딧은 디지털 상품으로 구매 즉시 충전되며, <span className="font-medium">환불이 불가</span>함을 확인합니다.
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            {/* Step 3: Payment buttons */}
+            <div className="mt-4 grid grid-cols-2 gap-3">
               {/* Stripe / Card */}
               <button
                 onClick={() => handleBuyCredits(selectedPack)}
-                disabled={buyingPack !== null}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-gray-200 bg-white px-4 py-4 text-base font-semibold text-gray-900 transition-all hover:border-indigo-300 hover:shadow-md disabled:opacity-50"
+                disabled={buyingPack !== null || !agreeTerms || !agreeRefund}
+                className="flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-gray-200 bg-white px-4 py-4 text-sm font-semibold text-gray-900 transition-all hover:border-indigo-300 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                💳 {buyingPack ? "처리중..." : `카드로 ${{ starter: 10, growth: 40, pro: 70 }[selectedPack]}  결제하기`}
+                <span>💳 {buyingPack ? "처리중..." : "카드로 결제하기"}</span>
               </button>
 
               {/* Crypto / Banksi PayButton */}
-              <CryptoPayButton
-                amount={{ starter: 10, growth: 40, pro: 70 }[selectedPack] || 40}
-                credits={{ starter: 100, growth: 500, pro: 1000 }[selectedPack] || 500}
-                onSuccess={async (credits: number) => {
-                  // Add credits via API
-                  const token = await getAuth_().currentUser?.getIdToken();
-                  await fetch("/api/payments/test-charge", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                    body: JSON.stringify({ credits }),
-                  });
-                  toast("success", `${credits} 크레딧이 충전되었습니다!`);
-                  await refreshProfile();
-                }}
-              />
+              <div className={!agreeTerms || !agreeRefund ? "opacity-50 pointer-events-none" : ""}>
+                <CryptoPayButton
+                  amount={{ starter: 9.5, growth: 38, pro: 66.5 }[selectedPack] || 38}
+                  credits={{ starter: 100, growth: 500, pro: 1000 }[selectedPack] || 500}
+                  onSuccess={async (credits: number) => {
+                    const token = await getAuth_().currentUser?.getIdToken();
+                    await fetch("/api/payments/test-charge", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                      body: JSON.stringify({ credits }),
+                    });
+                    toast("success", `${credits} 크레딧이 충전되었습니다!`);
+                    await refreshProfile();
+                  }}
+                />
+              </div>
             </div>
 
             <p className="mt-3 text-[10px] text-gray-400 text-center">
@@ -264,7 +306,6 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
-      )}
 
       {/* Profile */}
       <Card className="mt-6">
@@ -286,22 +327,13 @@ export default function SettingsPage() {
             </label>
             <p className="text-sm text-gray-600">{profile?.email}</p>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {t.settings.role}
-            </label>
-            <Badge>
-              {activeRole === "owner" ? t.sidebar.productOwner : t.sidebar.influencer}
-            </Badge>
-          </div>
           <Button onClick={handleSave} loading={saving}>
             {t.settings.saveChanges}
           </Button>
         </CardContent>
       </Card>
 
-      {/* Integrations (Owner only) */}
-      {activeRole === "owner" && (
+      {/* Integrations */}
         <Card className="mt-6">
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -310,6 +342,13 @@ export default function SettingsPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <p className="text-xs text-blue-800">
+                💡 Piped는 AI 기반 광고 카피·크리에이티브 생성과 캠페인 설정을 자동화합니다.
+                광고 예산 충전 및 실제 비용 집행은 각 플랫폼(Meta Ads, Google Ads)에서 직접 이루어지며,
+                Piped를 통해 광고비가 결제되지 않습니다.
+              </p>
+            </div>
             <div className="flex items-center justify-between rounded-lg border p-4">
               <div>
                 <p className="font-medium text-gray-900">{t.settings.metaAds}</p>
@@ -364,7 +403,6 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
-      )}
 
       {/* Crypto Wallet (for affiliate payouts) */}
       <Card className="mt-6">

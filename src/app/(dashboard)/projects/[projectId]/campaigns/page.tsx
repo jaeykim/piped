@@ -16,12 +16,14 @@ import {
   Plus, Megaphone, TrendingUp, DollarSign, Eye, MousePointer,
   ArrowRight, Users, RefreshCw, Play, Pause, BarChart3, Target,
 } from "lucide-react";
+import { useLocale } from "@/context/locale-context";
 import type { Campaign } from "@/types/campaign";
 
 export default function CampaignsPage() {
   const params = useParams();
   const projectId = params.projectId as string;
   const { toast } = useToast();
+  const { t } = useLocale();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -81,9 +83,9 @@ export default function CampaignsPage() {
         }
       }
       await loadCampaigns();
-      toast("success", "지표가 업데이트되었습니다");
+      toast("success", t.campaigns.metricsUpdated);
     } catch (e) {
-      toast("error", "지표 업데이트 실패");
+      toast("error", t.campaigns.metricsUpdateFailed);
     }
     setRefreshing(false);
   };
@@ -104,10 +106,10 @@ export default function CampaignsPage() {
           status: newStatus === "ACTIVE" ? "active" : "paused",
         });
         await loadCampaigns();
-        toast("success", newStatus === "ACTIVE" ? "광고가 시작되었습니다" : "광고가 중지되었습니다");
+        toast("success", newStatus === "ACTIVE" ? t.campaigns.adStarted : t.campaigns.adPaused);
       }
     } catch {
-      toast("error", "광고 상태 변경 실패");
+      toast("error", t.campaigns.adStatusFailed);
     }
   };
 
@@ -123,18 +125,18 @@ export default function CampaignsPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">캠페인 대시보드</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t.campaigns.dashboard}</h1>
         <div className="flex gap-2">
           {campaigns.length > 0 && (
             <Button variant="outline" onClick={handleRefreshMetrics} loading={refreshing} size="sm">
               <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-              지표 새로고침
+              {t.campaigns.refreshMetrics}
             </Button>
           )}
           <Link href={`/projects/${projectId}/campaigns/new`}>
             <Button size="sm">
               <Plus className="mr-1.5 h-3.5 w-3.5" />
-              새 캠페인
+              {t.campaigns.newCampaign}
             </Button>
           </Link>
         </div>
@@ -144,10 +146,10 @@ export default function CampaignsPage() {
         <Card className="mt-8">
           <CardContent className="py-16 text-center">
             <Megaphone className="mx-auto h-12 w-12 text-orange-300" />
-            <p className="mt-4 text-lg font-medium text-gray-900">캠페인이 없습니다</p>
-            <p className="mt-1 text-sm text-gray-500">첫 번째 광고 캠페인을 만들어보세요</p>
+            <p className="mt-4 text-lg font-medium text-gray-900">{t.campaigns.noCampaigns}</p>
+            <p className="mt-1 text-sm text-gray-500">{t.campaigns.noCampaignsDesc}</p>
             <Link href={`/projects/${projectId}/campaigns/new`}>
-              <Button className="mt-6"><Plus className="mr-2 h-4 w-4" />캠페인 만들기</Button>
+              <Button className="mt-6"><Plus className="mr-2 h-4 w-4" />{t.campaigns.createFirst}</Button>
             </Link>
           </CardContent>
         </Card>
@@ -156,10 +158,10 @@ export default function CampaignsPage() {
           {/* ─── Aggregate Dashboard ─── */}
           <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { label: "총 노출수", value: totalMetrics.impressions.toLocaleString(), icon: Eye, color: "text-blue-600 bg-blue-50" },
-              { label: "총 클릭수", value: totalMetrics.clicks.toLocaleString(), sub: `CTR ${totalCTR.toFixed(2)}%`, icon: MousePointer, color: "text-indigo-600 bg-indigo-50" },
-              { label: "총 지출", value: `$${totalMetrics.spend.toFixed(2)}`, sub: `CPC $${totalCPC.toFixed(2)}`, icon: DollarSign, color: "text-orange-600 bg-orange-50" },
-              { label: "ROAS", value: totalROAS > 0 ? `${totalROAS.toFixed(1)}x` : "-", sub: `전환 ${totalMetrics.conversions}건`, icon: TrendingUp, color: "text-green-600 bg-green-50" },
+              { label: t.campaigns.totalImpressions, value: totalMetrics.impressions.toLocaleString(), icon: Eye, color: "text-blue-600 bg-blue-50" },
+              { label: t.campaigns.totalClicks, value: totalMetrics.clicks.toLocaleString(), sub: `CTR ${totalCTR.toFixed(2)}%`, icon: MousePointer, color: "text-indigo-600 bg-indigo-50" },
+              { label: t.campaigns.totalSpend, value: `$${totalMetrics.spend.toFixed(2)}`, sub: `CPC $${totalCPC.toFixed(2)}`, icon: DollarSign, color: "text-orange-600 bg-orange-50" },
+              { label: "ROAS", value: totalROAS > 0 ? `${totalROAS.toFixed(1)}x` : "-", sub: `${t.campaigns.conversions} ${totalMetrics.conversions}`, icon: TrendingUp, color: "text-green-600 bg-green-50" },
             ].map((stat) => {
               const Icon = stat.icon;
               return (
@@ -182,7 +184,7 @@ export default function CampaignsPage() {
           </div>
 
           {/* ─── Campaign List ─── */}
-          <h2 className="mt-8 text-sm font-semibold text-gray-500 uppercase tracking-wider">캠페인 목록</h2>
+          <h2 className="mt-8 text-sm font-semibold text-gray-500 uppercase tracking-wider">{t.campaigns.campaignList}</h2>
           <div className="mt-3 space-y-3">
             {campaigns.map((campaign) => (
               <Card key={campaign.id} className="transition-all hover:shadow-md">
@@ -212,9 +214,9 @@ export default function CampaignsPage() {
                         onClick={() => handleToggleAd(campaign)}
                       >
                         {campaign.status === "active" ? (
-                          <><Pause className="mr-1.5 h-3.5 w-3.5" />중지</>
+                          <><Pause className="mr-1.5 h-3.5 w-3.5" />{t.campaigns.pause}</>
                         ) : (
-                          <><Play className="mr-1.5 h-3.5 w-3.5" />시작</>
+                          <><Play className="mr-1.5 h-3.5 w-3.5" />{t.campaigns.resume}</>
                         )}
                       </Button>
                     )}
@@ -223,12 +225,12 @@ export default function CampaignsPage() {
                   {campaign.metrics && (
                     <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6 rounded-lg bg-gray-50 p-3">
                       {[
-                        { label: "노출", value: campaign.metrics.impressions.toLocaleString() },
-                        { label: "클릭", value: campaign.metrics.clicks.toLocaleString() },
+                        { label: t.campaigns.impressions, value: campaign.metrics.impressions.toLocaleString() },
+                        { label: t.campaigns.clicks, value: campaign.metrics.clicks.toLocaleString() },
                         { label: "CTR", value: `${((campaign.metrics as unknown as Record<string, number>).ctr || 0).toFixed(2)}%` },
-                        { label: "지출", value: `$${campaign.metrics.spend.toFixed(2)}` },
+                        { label: t.campaigns.spend, value: `$${campaign.metrics.spend.toFixed(2)}` },
                         { label: "CPC", value: `$${((campaign.metrics as unknown as Record<string, number>).cpc || 0).toFixed(2)}` },
-                        { label: "전환", value: campaign.metrics.conversions.toString() },
+                        { label: t.campaigns.conversions, value: campaign.metrics.conversions.toString() },
                       ].map((s) => (
                         <div key={s.label} className="text-center">
                           <p className="text-sm font-semibold text-gray-900">{s.value}</p>
@@ -249,13 +251,13 @@ export default function CampaignsPage() {
                 <Users className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="font-medium text-gray-900">다음: 제휴 프로그램</p>
-                <p className="text-sm text-gray-500">인플루언서가 제품을 홍보하고 커미션을 받습니다</p>
+                <p className="font-medium text-gray-900">{t.campaigns.nextAffiliates}</p>
+                <p className="text-sm text-gray-500">{t.campaigns.nextAffiliatesDesc}</p>
               </div>
             </div>
             <Link href={`/projects/${projectId}/affiliates`}>
               <Button>
-                Continue
+                {t.common.continue}
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>

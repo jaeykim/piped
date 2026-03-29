@@ -19,9 +19,10 @@ export interface AnalysisResult {
 }
 
 export async function analyzeWebsite(
-  crawl: CrawlResult
+  crawl: CrawlResult,
+  locale?: string
 ): Promise<SiteAnalysis> {
-  const { systemPrompt, userPrompt } = buildAnalysisPrompt(crawl);
+  const { systemPrompt, userPrompt } = buildAnalysisPrompt(crawl, locale);
 
   const message = await anthropic.messages.create({
     model: "claude-sonnet-4-20250514",

@@ -267,11 +267,12 @@ export async function POST(request: NextRequest) {
     // Derive all formats from the single base image
     const formats = await deriveFormats(result.imageData, result.mimeType, size);
 
-    // Save primary to Firestore
+    // Save primary to Firestore (include base64 for affiliate material display)
+    const imageDataUri = `data:${result.mimeType};base64,${result.imageData}`;
     const ref = await adminDb
       .collection(`projects/${projectId}/creatives`)
       .add({
-        imageUrl: "",
+        imageUrl: imageDataUri,
         prompt: result.prompt,
         size,
         platform,

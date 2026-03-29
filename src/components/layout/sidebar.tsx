@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   FolderKanban,
@@ -9,7 +9,6 @@ import {
   Settings,
   LogOut,
   Zap,
-  ArrowLeftRight,
 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useLocale } from "@/context/locale-context";
@@ -17,31 +16,17 @@ import { signOut } from "@/lib/firebase/auth";
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const { profile, activeRole, switchRole } = useAuth();
+  const { profile } = useAuth();
   const { t } = useLocale();
 
-  const ownerNav = [
+  const nav = [
     { label: t.sidebar.dashboard, href: "/dashboard", icon: LayoutDashboard },
     { label: t.sidebar.projects, href: "/projects", icon: FolderKanban },
-    { label: t.sidebar.settings, href: "/settings", icon: Settings },
-  ];
-
-  const influencerNav = [
-    { label: t.sidebar.dashboard, href: "/dashboard", icon: LayoutDashboard },
-    { label: t.sidebar.browsePrograms, href: "/affiliates", icon: FolderKanban },
-    { label: t.sidebar.myPrograms, href: "/affiliates/my-programs", icon: Users },
+    { label: t.sidebar.partnerHub, href: "/affiliates", icon: Users },
+    { label: t.sidebar.myPrograms, href: "/affiliates/my-programs", icon: FolderKanban },
     { label: t.sidebar.earnings, href: "/affiliates/earnings", icon: Zap },
     { label: t.sidebar.settings, href: "/settings", icon: Settings },
   ];
-
-  const nav = activeRole === "influencer" ? influencerNav : ownerNav;
-
-  const handleSwitch = () => {
-    const newRole = activeRole === "owner" ? "influencer" : "owner";
-    switchRole(newRole);
-    router.push("/dashboard");
-  };
 
   return (
     <aside className="flex h-full w-64 flex-col border-r border-gray-200 bg-white">
@@ -51,28 +36,6 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           <Zap className="h-4.5 w-4.5 text-white" />
         </div>
         <span className="text-lg font-bold text-gray-900">Piped</span>
-      </div>
-
-      {/* Role Switcher */}
-      <div className="border-b border-gray-100 p-3">
-        <button
-          onClick={handleSwitch}
-          className="flex w-full items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm transition-colors hover:bg-gray-100"
-        >
-          <div className="flex items-center gap-2">
-            <div
-              className={`flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold text-white ${
-                activeRole === "owner" ? "bg-indigo-600" : "bg-emerald-600"
-              }`}
-            >
-              {activeRole === "owner" ? "O" : "I"}
-            </div>
-            <span className="font-medium text-gray-700">
-              {activeRole === "owner" ? t.sidebar.productOwner : t.sidebar.influencer}
-            </span>
-          </div>
-          <ArrowLeftRight className="h-3.5 w-3.5 text-gray-400" />
-        </button>
       </div>
 
       {/* Navigation */}
@@ -99,23 +62,21 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
 
       {/* Credits */}
-      {activeRole === "owner" && (
-        <div className="border-t border-gray-100 p-3">
-          <div className="rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 p-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-gray-500">크레딧 잔액</span>
-              <span className="text-lg font-bold text-indigo-600">{profile?.credits ?? 0}</span>
-            </div>
-            <Link
-              href="/settings"
-              onClick={onNavigate}
-              className="mt-2 flex w-full items-center justify-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 transition-colors"
-            >
-              충전하기
-            </Link>
+      <div className="border-t border-gray-100 p-3">
+        <div className="rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-gray-500">크레딧 잔액</span>
+            <span className="text-lg font-bold text-indigo-600">{(profile?.credits ?? 0).toLocaleString()}</span>
           </div>
+          <Link
+            href="/settings"
+            onClick={onNavigate}
+            className="mt-2 flex w-full items-center justify-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 transition-colors"
+          >
+            충전하기
+          </Link>
         </div>
-      )}
+      </div>
 
       {/* User Section */}
       <div className="border-t border-gray-100 p-3">
@@ -126,9 +87,6 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-gray-900">
               {profile?.displayName || "User"}
-            </p>
-            <p className="truncate text-[11px] text-gray-400">
-              {activeRole === "owner" ? t.sidebar.productOwner : t.sidebar.influencer}
             </p>
           </div>
         </div>

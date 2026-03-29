@@ -36,6 +36,7 @@ export interface AppText {
     dashboard: string;
     projects: string;
     browsePrograms: string;
+    partnerHub: string;
     myPrograms: string;
     earnings: string;
     settings: string;
@@ -81,6 +82,19 @@ export interface AppText {
     fetchingContent: string;
     extractingMeta: string;
     analyzingBrand: string;
+    chooseCampaignType: string;
+    campaignType: string;
+    websiteUrl: string;
+    changeCampaignType: string;
+    notEnoughCredits: string;
+    notEnoughCreditsDesc: string;
+    buyCredits: string;
+    // Stage labels
+    stageAnalyzing: string;
+    stageCopy: string;
+    stageCreatives: string;
+    stageCampaigns: string;
+    stageAffiliates: string;
   };
   // Project detail
   projectDetail: {
@@ -89,18 +103,26 @@ export interface AppText {
     product: string;
     audience: string;
     features: string;
+    toneAndIndustry: string;
+    brandColors: string;
     generateCopy: string;
     generateCopyDesc: string;
     createCreatives: string;
     createCreativesDesc: string;
+    videoProduction: string;
+    videoProductionDesc: string;
     launchCampaigns: string;
     launchCampaignsDesc: string;
     affiliateProgram: string;
     affiliateProgramDesc: string;
+    completed: string;
+    currentStep: string;
+    clickToEdit: string;
   };
   // Copy
   copy: {
     title: string;
+    subtitle: string;
     selectCountry: string;
     selectLanguage: string;
     generateButton: string;
@@ -120,10 +142,24 @@ export interface AppText {
     ctas: string;
     edited: string;
     copyUpdated: string;
+    save: string;
+    cancel: string;
+    edit: string;
+    generatingHeadlines: string;
+    generatingDescs: string;
+    generatingAdCopy: string;
+    generatingSocial: string;
   };
   // Creatives
   creatives: {
     title: string;
+    whatToCreate: string;
+    imageAd: string;
+    imageAdDesc: string;
+    imageAdDetail: string;
+    videoAd: string;
+    videoAdDesc: string;
+    videoAdDetail: string;
     selectConcept: string;
     selectSubject: string;
     selectCopy: string;
@@ -150,6 +186,10 @@ export interface AppText {
     allFailed: string;
     nextCampaigns: string;
     nextCampaignsDesc: string;
+    changeImage: string;
+    selectImage: string;
+    videoGenerating: string;
+    videoCredits: string;
   };
   // Settings
   settings: {
@@ -178,14 +218,19 @@ export interface AppText {
   // Campaigns
   campaigns: {
     title: string;
+    dashboard: string;
     newCampaign: string;
     noCampaigns: string;
     noCampaignsDesc: string;
+    createFirst: string;
     platform: string;
     choosePlatform: string;
     content: string;
     selectAdCopy: string;
+    noCopy: string;
     selectCreative: string;
+    noCreative: string;
+    selected: string;
     targeting: string;
     minAge: string;
     maxAge: string;
@@ -203,6 +248,76 @@ export interface AppText {
     creationFailed: string;
     back: string;
     next: string;
+    // Campaign list stats
+    refreshMetrics: string;
+    campaignList: string;
+    totalImpressions: string;
+    totalClicks: string;
+    totalSpend: string;
+    impressions: string;
+    clicks: string;
+    spend: string;
+    ctr: string;
+    cpc: string;
+    roas: string;
+    conversions: string;
+    pause: string;
+    resume: string;
+    metricsUpdated: string;
+    metricsUpdateFailed: string;
+    adStarted: string;
+    adPaused: string;
+    adStatusFailed: string;
+    // Influencer campaign
+    goalAndCommission: string;
+    goalLabel: string;
+    visits: string;
+    visitsDesc: string;
+    signups: string;
+    signupsDesc: string;
+    purchases: string;
+    purchasesDesc: string;
+    recommended: string;
+    commissionType: string;
+    fixedAmount: string;
+    percentage: string;
+    commissionLabel: string;
+    cookieDuration: string;
+    estimatedCost: string;
+    influencerBudget: string;
+    totalBudget: string;
+    budgetExhausted: string;
+    trackingMetrics: string;
+    referralClicks: string;
+    uniqueVisitors: string;
+    signupConversions: string;
+    purchaseConversions: string;
+    conversionRate: string;
+    performanceByInfluencer: string;
+    commissionStatus: string;
+    roi: string;
+    campaignReview: string;
+    type: string;
+    goal: string;
+    commissionPerAction: string;
+    cookiePeriod: string;
+    status: string;
+    autoCreateAffiliate: string;
+    createdAsPaused: string;
+    targetInfo: string;
+    influencerCreated: string;
+    // Tracking setup
+    signupTrackingGuide: string;
+    purchaseTrackingGuide: string;
+    autoTracked: string;
+    externalSignupTracking: string;
+    externalPurchaseTracking: string;
+    cookieAutoRead: string;
+    claudeCodeGuide: string;
+    claudeCodeTrackingDesc: string;
+    // Next section
+    nextAffiliates: string;
+    nextAffiliatesDesc: string;
   };
   // Affiliates
   affiliates: {
@@ -229,6 +344,17 @@ export interface AppText {
     success: string;
     notAuthenticated: string;
     waiting: string;
+    next: string;
+    back: string;
+    save: string;
+    cancel: string;
+    continue: string;
+    delete: string;
+    confirm: string;
+    credits: string;
+    creditsPerUnit: string;
+    popular: string;
+    processing: string;
   };
 }
 
@@ -254,7 +380,7 @@ const en: AppText = {
   onboarding: {
     title: "Choose Your Role",
     subtitle: "How will you use Piped?",
-    owner: "Product Owner",
+    owner: "Maker",
     ownerDesc: "I built a product and want to automate marketing with AI-generated copy, creatives, and ad campaigns.",
     influencer: "Influencer",
     influencerDesc: "I want to discover great products, promote them to my audience, and earn commissions.",
@@ -263,24 +389,25 @@ const en: AppText = {
   },
   sidebar: {
     dashboard: "Dashboard",
-    projects: "Projects",
+    projects: "Campaigns",
     browsePrograms: "Browse Programs",
+    partnerHub: "Partner Hub",
     myPrograms: "My Programs",
     earnings: "Earnings",
     settings: "Settings",
     signOut: "Sign Out",
-    productOwner: "Product Owner",
+    productOwner: "Maker",
     influencer: "Influencer",
   },
   dashboard: {
     title: "Dashboard",
     welcomeBack: "Welcome back",
-    newProject: "New Project",
-    recentProjects: "Recent Projects",
-    noProjects: "No projects yet",
-    noProjectsDesc: "Create your first project to start the marketing pipeline.",
-    createProject: "Create Project",
-    projectCount: "Projects",
+    newProject: "New Campaign",
+    recentProjects: "Recent Campaigns",
+    noProjects: "No campaigns yet",
+    noProjectsDesc: "Create your first campaign to start the marketing pipeline.",
+    createProject: "Create Campaign",
+    projectCount: "Campaigns",
     campaignCount: "Campaigns",
     affiliateCount: "Affiliates",
     welcomeInfluencer: "Welcome",
@@ -289,24 +416,36 @@ const en: AppText = {
     findProducts: "Find products to promote",
     myEarnings: "My Earnings",
     trackCommissions: "Track your commissions",
-    deleteConfirm: 'Delete project "{name}"? This cannot be undone.',
-    deleted: "Project deleted",
+    deleteConfirm: 'Delete campaign "{name}"? This cannot be undone.',
+    deleted: "Campaign deleted",
     deleteFailed: "Failed to delete",
   },
   projects: {
-    title: "New Project",
-    newProject: "New Project",
+    title: "New Campaign",
+    newProject: "New Campaign",
     enterUrl: "Enter your website URL",
     enterUrlDesc: "We'll crawl and analyze your page with AI",
     urlPlaceholder: "https://your-product.com",
     startPipeline: "Start Pipeline",
-    creating: "Creating project...",
+    creating: "Creating campaign...",
     crawling: "Crawling website...",
     analyzed: "Website analyzed successfully!",
     analysisFailed: "Analysis failed",
     fetchingContent: "Fetching page content",
     extractingMeta: "Extracting text and metadata",
     analyzingBrand: "AI analyzing your brand",
+    chooseCampaignType: "Choose Campaign Type",
+    campaignType: "Campaign Type",
+    websiteUrl: "Website URL",
+    changeCampaignType: "Change campaign type",
+    notEnoughCredits: "Not enough credits",
+    notEnoughCreditsDesc: "You need at least {min} credits. Current balance: {current}",
+    buyCredits: "Buy Credits",
+    stageAnalyzing: "Analyzing",
+    stageCopy: "Copy Ready",
+    stageCreatives: "Creatives",
+    stageCampaigns: "Campaigns",
+    stageAffiliates: "Affiliates",
   },
   projectDetail: {
     pipelineProgress: "Pipeline Progress",
@@ -314,17 +453,25 @@ const en: AppText = {
     product: "Product",
     audience: "Target Audience",
     features: "Key Features",
+    toneAndIndustry: "Tone & Industry",
+    brandColors: "Brand Colors",
     generateCopy: "Generate Marketing Copy",
     generateCopyDesc: "AI-powered headlines, descriptions, and ad copy",
     createCreatives: "Create Ad Creatives",
     createCreativesDesc: "Stunning visuals for every platform",
+    videoProduction: "Video Production",
+    videoProductionDesc: "Convert ad images to AI video",
     launchCampaigns: "Launch Campaigns",
     launchCampaignsDesc: "Deploy to Meta & Google Ads",
     affiliateProgram: "Affiliate Program",
     affiliateProgramDesc: "Let influencers promote your product",
+    completed: "Done",
+    currentStep: "Current",
+    clickToEdit: "Click to edit or regenerate",
   },
   copy: {
     title: "Marketing Copy",
+    subtitle: "Select target country and language to generate marketing copy",
     selectCountry: "Target Country",
     selectLanguage: "Ad Language",
     generateButton: "Generate Marketing Copy",
@@ -344,9 +491,23 @@ const en: AppText = {
     ctas: "CTAs",
     edited: "Edited",
     copyUpdated: "Copy updated",
+    save: "Save",
+    cancel: "Cancel",
+    edit: "Edit",
+    generatingHeadlines: "Generating Headlines",
+    generatingDescs: "Generating Descriptions",
+    generatingAdCopy: "Generating Ad Copy",
+    generatingSocial: "Generating Social Posts",
   },
   creatives: {
     title: "Ad Creatives",
+    whatToCreate: "What would you like to create?",
+    imageAd: "Image Ad",
+    imageAdDesc: "Create static image ads for Instagram, Facebook, Google.",
+    imageAdDetail: "AI image generation + text overlay + 5 format auto-conversion",
+    videoAd: "Video Ad",
+    videoAdDesc: "Create 5-second motion videos from images.",
+    videoAdDetail: "Cinematic motion generation with Google Veo AI",
     selectConcept: "Choose a concept to hook your audience",
     selectSubject: "Ad Subject",
     selectCopy: "Select Marketing Copy",
@@ -373,6 +534,10 @@ const en: AppText = {
     allFailed: "Image generation failed. Please try again.",
     nextCampaigns: "Next: Launch Campaigns",
     nextCampaignsDesc: "Set up ad campaigns on Meta or Google Ads",
+    changeImage: "Change Image",
+    selectImage: "Select Image",
+    videoGenerating: "Generating video...",
+    videoCredits: "Create Video (30 credits)",
   },
   settings: {
     title: "Settings",
@@ -399,14 +564,19 @@ const en: AppText = {
   },
   campaigns: {
     title: "Campaigns",
+    dashboard: "Campaign Dashboard",
     newCampaign: "New Campaign",
     noCampaigns: "No campaigns yet",
     noCampaignsDesc: "Create your first ad campaign.",
+    createFirst: "Create Campaign",
     platform: "Platform",
     choosePlatform: "Choose Platform",
     content: "Content",
     selectAdCopy: "Select Ad Copy",
+    noCopy: "No copy generated yet. Please generate copy first.",
     selectCreative: "Select Creative",
+    noCreative: "No creatives generated yet. Please create creatives first.",
+    selected: "Selected",
     targeting: "Targeting",
     minAge: "Min Age",
     maxAge: "Max Age",
@@ -424,6 +594,72 @@ const en: AppText = {
     creationFailed: "Campaign creation failed",
     back: "Back",
     next: "Next",
+    refreshMetrics: "Refresh Metrics",
+    campaignList: "Campaign List",
+    totalImpressions: "Total Impressions",
+    totalClicks: "Total Clicks",
+    totalSpend: "Total Spend",
+    impressions: "Impressions",
+    clicks: "Clicks",
+    spend: "Spend",
+    ctr: "CTR",
+    cpc: "CPC",
+    roas: "ROAS",
+    conversions: "Conversions",
+    pause: "Pause",
+    resume: "Resume",
+    metricsUpdated: "Metrics updated",
+    metricsUpdateFailed: "Failed to update metrics",
+    adStarted: "Ad started",
+    adPaused: "Ad paused",
+    adStatusFailed: "Failed to change ad status",
+    goalAndCommission: "Goal & Commission Setup",
+    goalLabel: "Performance Goal",
+    visits: "Visits",
+    visitsDesc: "Commission per click",
+    signups: "Signups",
+    signupsDesc: "Commission per signup",
+    purchases: "Purchases",
+    purchasesDesc: "Commission per purchase",
+    recommended: "Recommended",
+    commissionType: "Commission Type",
+    fixedAmount: "Fixed Amount ($)",
+    percentage: "Percentage (%)",
+    commissionLabel: "Commission",
+    cookieDuration: "Cookie Duration (days)",
+    estimatedCost: "Estimated Cost",
+    influencerBudget: "Influencer Campaign Budget",
+    totalBudget: "Total Budget (USD)",
+    budgetExhausted: "Campaign auto-pauses when budget is exhausted",
+    trackingMetrics: "Tracking Metrics",
+    referralClicks: "Referral Clicks",
+    uniqueVisitors: "Unique Visitors",
+    signupConversions: "Signup Conversions",
+    purchaseConversions: "Purchase Conversions",
+    conversionRate: "Conversion Rate (CVR)",
+    performanceByInfluencer: "Performance by Influencer",
+    commissionStatus: "Commission Payout Status",
+    roi: "ROI",
+    campaignReview: "Campaign Review",
+    type: "Type",
+    goal: "Goal",
+    commissionPerAction: "Commission per action",
+    cookiePeriod: "Cookie Period",
+    status: "Status",
+    autoCreateAffiliate: "Auto-create affiliate program",
+    createdAsPaused: "Created as PAUSED",
+    targetInfo: "Target",
+    influencerCreated: "Influencer campaign created!",
+    signupTrackingGuide: "Signup Tracking Guide",
+    purchaseTrackingGuide: "Purchase Tracking Guide",
+    autoTracked: "Auto-tracked: Users who sign up via Piped are tracked by referral cookie.",
+    externalSignupTracking: "External signup tracking: Add this code to your signup completion page:",
+    externalPurchaseTracking: "External payment tracking: Call this on payment completion:",
+    cookieAutoRead: "The referral cookie (piped_ref) is read automatically to attribute commissions.",
+    claudeCodeGuide: "Using Claude Code?",
+    claudeCodeTrackingDesc: "Tell Claude Code to add tracking to your project:",
+    nextAffiliates: "Next: Affiliate Program",
+    nextAffiliatesDesc: "Influencers promote your product and earn commissions",
   },
   affiliates: {
     browseTitle: "Browse Affiliate Programs",
@@ -448,6 +684,17 @@ const en: AppText = {
     success: "Success",
     notAuthenticated: "Not authenticated",
     waiting: "Waiting",
+    next: "Next",
+    back: "Back",
+    save: "Save",
+    cancel: "Cancel",
+    continue: "Continue",
+    delete: "Delete",
+    confirm: "Confirm",
+    credits: "Credits",
+    creditsPerUnit: "per credit",
+    popular: "Popular",
+    processing: "Processing...",
   },
 };
 
@@ -473,7 +720,7 @@ const ko: AppText = {
   onboarding: {
     title: "역할을 선택하세요",
     subtitle: "Piped를 어떻게 사용하실 건가요?",
-    owner: "프로덕트 오너",
+    owner: "메이커",
     ownerDesc: "제품을 만들었고, AI 기반 마케팅 자동화(카피, 크리에이티브, 광고 캠페인)를 원합니다.",
     influencer: "인플루언서",
     influencerDesc: "좋은 제품을 발견하고, 홍보하여 커미션을 받고 싶습니다.",
@@ -482,24 +729,25 @@ const ko: AppText = {
   },
   sidebar: {
     dashboard: "대시보드",
-    projects: "프로젝트",
+    projects: "캠페인",
     browsePrograms: "프로그램 둘러보기",
+    partnerHub: "파트너 허브",
     myPrograms: "내 프로그램",
     earnings: "수익",
     settings: "설정",
     signOut: "로그아웃",
-    productOwner: "프로덕트 오너",
+    productOwner: "메이커",
     influencer: "인플루언서",
   },
   dashboard: {
     title: "대시보드",
     welcomeBack: "돌아오셨군요",
-    newProject: "새 프로젝트",
-    recentProjects: "최근 프로젝트",
-    noProjects: "프로젝트가 없습니다",
-    noProjectsDesc: "첫 번째 프로젝트를 만들어 마케팅 파이프라인을 시작하세요.",
-    createProject: "프로젝트 만들기",
-    projectCount: "프로젝트",
+    newProject: "새 캠페인",
+    recentProjects: "최근 캠페인",
+    noProjects: "캠페인이 없습니다",
+    noProjectsDesc: "첫 번째 캠페인을 만들어 마케팅 파이프라인을 시작하세요.",
+    createProject: "캠페인 만들기",
+    projectCount: "캠페인",
     campaignCount: "캠페인",
     affiliateCount: "제휴",
     welcomeInfluencer: "환영합니다",
@@ -508,24 +756,36 @@ const ko: AppText = {
     findProducts: "홍보할 제품 찾기",
     myEarnings: "내 수익",
     trackCommissions: "커미션 추적",
-    deleteConfirm: '"{name}" 프로젝트를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.',
-    deleted: "프로젝트가 삭제되었습니다",
+    deleteConfirm: '"{name}" 캠페인을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.',
+    deleted: "캠페인이 삭제되었습니다",
     deleteFailed: "삭제에 실패했습니다",
   },
   projects: {
-    title: "새 프로젝트",
-    newProject: "새 프로젝트",
+    title: "새 캠페인",
+    newProject: "새 캠페인",
     enterUrl: "웹사이트 URL을 입력하세요",
     enterUrlDesc: "AI가 페이지를 크롤링하고 분석합니다",
     urlPlaceholder: "https://your-product.com",
     startPipeline: "파이프라인 시작",
-    creating: "프로젝트 생성중...",
+    creating: "캠페인 생성중...",
     crawling: "웹사이트 크롤링중...",
     analyzed: "웹사이트 분석 완료!",
     analysisFailed: "분석에 실패했습니다",
     fetchingContent: "페이지 콘텐츠 가져오는 중",
     extractingMeta: "텍스트 및 메타데이터 추출 중",
     analyzingBrand: "AI가 브랜드 분석 중",
+    chooseCampaignType: "캠페인 유형 선택",
+    campaignType: "캠페인 유형",
+    websiteUrl: "웹사이트 입력",
+    changeCampaignType: "캠페인 유형 변경",
+    notEnoughCredits: "크레딧이 부족합니다",
+    notEnoughCreditsDesc: "프로젝트를 진행하려면 최소 {min} 크레딧이 필요합니다. 현재 잔액: {current}",
+    buyCredits: "크레딧 충전하기",
+    stageAnalyzing: "분석중",
+    stageCopy: "문구 완료",
+    stageCreatives: "크리에이티브",
+    stageCampaigns: "캠페인",
+    stageAffiliates: "제휴",
   },
   projectDetail: {
     pipelineProgress: "파이프라인 진행 상황",
@@ -533,22 +793,30 @@ const ko: AppText = {
     product: "제품",
     audience: "타겟 고객",
     features: "핵심 기능",
+    toneAndIndustry: "톤 & 산업",
+    brandColors: "브랜드 컬러",
     generateCopy: "마케팅 문구 생성",
     generateCopyDesc: "AI 기반 헤드라인, 설명, 광고 카피",
     createCreatives: "광고 크리에이티브 제작",
     createCreativesDesc: "모든 플랫폼용 비주얼 제작",
+    videoProduction: "영상 제작",
+    videoProductionDesc: "광고 이미지를 AI 영상으로 변환",
     launchCampaigns: "캠페인 런칭",
     launchCampaignsDesc: "Meta & Google Ads에 배포",
     affiliateProgram: "제휴 프로그램",
     affiliateProgramDesc: "인플루언서가 제품을 홍보",
+    completed: "완료",
+    currentStep: "현재 단계",
+    clickToEdit: "클릭하여 수정하거나 다시 생성할 수 있습니다",
   },
   copy: {
     title: "마케팅 문구",
+    subtitle: "대상 국가와 언어를 선택하면 바로 마케팅 문구를 생성합니다",
     selectCountry: "대상 국가",
     selectLanguage: "광고 언어",
     generateButton: "마케팅 문구 생성하기",
     generating: "마케팅 문구 생성 중...",
-    generatingDesc: "Headlines, Descriptions, Ad Copy, Social Posts 생성 중",
+    generatingDesc: "헤드라인, 설명, 광고 카피, 소셜 포스트 생성 중",
     generated: "마케팅 문구가 생성되었습니다!",
     regenerateAll: "전체 재생성",
     nextCreatives: "다음: 광고 크리에이티브 제작",
@@ -563,9 +831,23 @@ const ko: AppText = {
     ctas: "CTA",
     edited: "수정됨",
     copyUpdated: "문구가 수정되었습니다",
+    save: "저장",
+    cancel: "취소",
+    edit: "수정",
+    generatingHeadlines: "헤드라인 생성중",
+    generatingDescs: "설명 생성중",
+    generatingAdCopy: "광고 카피 생성중",
+    generatingSocial: "소셜 포스트 생성중",
   },
   creatives: {
     title: "광고 크리에이티브",
+    whatToCreate: "어떤 콘텐츠를 만들까요?",
+    imageAd: "이미지 광고",
+    imageAdDesc: "Instagram, Facebook, Google 용 정적 이미지 광고를 만듭니다.",
+    imageAdDetail: "AI 이미지 생성 + 텍스트 오버레이 + 5개 포맷 자동 변환",
+    videoAd: "영상 광고",
+    videoAdDesc: "이미지를 기반으로 5초 모션 영상을 만듭니다.",
+    videoAdDetail: "Google Veo AI로 시네마틱 모션 생성",
     selectConcept: "어떤 컨셉으로 후킹할지 선택하세요",
     selectSubject: "광고 주인공",
     selectCopy: "마케팅 문구 선택",
@@ -592,6 +874,10 @@ const ko: AppText = {
     allFailed: "이미지 생성에 실패했습니다. 다시 시도해주세요.",
     nextCampaigns: "다음: 캠페인 런칭",
     nextCampaignsDesc: "Meta 또는 Google Ads에 캠페인 설정",
+    changeImage: "이미지 변경",
+    selectImage: "이미지 선택",
+    videoGenerating: "영상 생성중...",
+    videoCredits: "영상 만들기 (30 크레딧)",
   },
   settings: {
     title: "설정",
@@ -618,14 +904,19 @@ const ko: AppText = {
   },
   campaigns: {
     title: "캠페인",
+    dashboard: "캠페인 대시보드",
     newCampaign: "새 캠페인",
     noCampaigns: "캠페인이 없습니다",
     noCampaignsDesc: "첫 번째 광고 캠페인을 만들어보세요.",
+    createFirst: "캠페인 만들기",
     platform: "플랫폼",
     choosePlatform: "플랫폼 선택",
     content: "콘텐츠",
     selectAdCopy: "광고 문구 선택",
+    noCopy: "생성된 카피가 없습니다. 먼저 Copy 단계에서 문구를 생성하세요.",
     selectCreative: "크리에이티브 선택",
+    noCreative: "생성된 크리에이티브가 없습니다. 먼저 크리에이티브를 생성하세요.",
+    selected: "선택됨",
     targeting: "타겟팅",
     minAge: "최소 연령",
     maxAge: "최대 연령",
@@ -643,6 +934,72 @@ const ko: AppText = {
     creationFailed: "캠페인 생성에 실패했습니다",
     back: "뒤로",
     next: "다음",
+    refreshMetrics: "지표 새로고침",
+    campaignList: "캠페인 목록",
+    totalImpressions: "총 노출수",
+    totalClicks: "총 클릭수",
+    totalSpend: "총 지출",
+    impressions: "노출",
+    clicks: "클릭",
+    spend: "지출",
+    ctr: "CTR",
+    cpc: "CPC",
+    roas: "ROAS",
+    conversions: "전환",
+    pause: "중지",
+    resume: "시작",
+    metricsUpdated: "지표가 업데이트되었습니다",
+    metricsUpdateFailed: "지표 업데이트 실패",
+    adStarted: "광고가 시작되었습니다",
+    adPaused: "광고가 중지되었습니다",
+    adStatusFailed: "광고 상태 변경 실패",
+    goalAndCommission: "성과 목표 & 커미션 설정",
+    goalLabel: "성과 목표",
+    visits: "방문",
+    visitsDesc: "링크 클릭당 커미션",
+    signups: "가입",
+    signupsDesc: "회원가입당 커미션",
+    purchases: "구매",
+    purchasesDesc: "구매 전환당 커미션",
+    recommended: "추천",
+    commissionType: "커미션 유형",
+    fixedAmount: "고정 금액 ($)",
+    percentage: "비율 (%)",
+    commissionLabel: "커미션",
+    cookieDuration: "쿠키 유효 기간 (일)",
+    estimatedCost: "예상 비용",
+    influencerBudget: "인플루언서 캠페인 예산",
+    totalBudget: "총 예산 (USD)",
+    budgetExhausted: "예산 소진 시 캠페인이 자동 중지됩니다",
+    trackingMetrics: "추적 지표",
+    referralClicks: "레퍼럴 클릭 수",
+    uniqueVisitors: "고유 방문자 수",
+    signupConversions: "회원가입 전환",
+    purchaseConversions: "구매 전환",
+    conversionRate: "전환율 (CVR)",
+    performanceByInfluencer: "인플루언서별 성과",
+    commissionStatus: "커미션 지급 현황",
+    roi: "ROI (투자 대비 수익)",
+    campaignReview: "캠페인 확인",
+    type: "유형",
+    goal: "성과 목표",
+    commissionPerAction: "건당 커미션",
+    cookiePeriod: "쿠키 기간",
+    status: "상태",
+    autoCreateAffiliate: "제휴 프로그램 자동 생성",
+    createdAsPaused: "PAUSED로 생성",
+    targetInfo: "타겟",
+    influencerCreated: "인플루언서 캠페인이 생성되었습니다!",
+    signupTrackingGuide: "가입 추적 설정 안내",
+    purchaseTrackingGuide: "구매 추적 설정 안내",
+    autoTracked: "자동 추적됨: Piped를 통해 가입한 유저는 레퍼럴 쿠키로 자동 추적됩니다.",
+    externalSignupTracking: "외부 서비스 가입 추적: 가입 완료 페이지에 아래 코드를 추가하세요:",
+    externalPurchaseTracking: "외부 결제 추적: 결제 완료 시 아래 코드를 호출하세요:",
+    cookieAutoRead: "레퍼럴 쿠키 (piped_ref)가 자동으로 읽혀서 인플루언서에게 커미션이 지급됩니다.",
+    claudeCodeGuide: "Claude Code를 사용하시나요?",
+    claudeCodeTrackingDesc: "Claude Code에 이렇게 명령하세요:",
+    nextAffiliates: "다음: 제휴 프로그램",
+    nextAffiliatesDesc: "인플루언서가 제품을 홍보하고 커미션을 받습니다",
   },
   affiliates: {
     browseTitle: "제휴 프로그램 둘러보기",
@@ -654,7 +1011,7 @@ const ko: AppText = {
     cookieDays: "쿠키 기간",
     affiliateCount: "제휴 파트너",
     joinProgram: "프로그램 참여",
-    switchToJoin: "Influencer 모드로 전환하여 참여하세요",
+    switchToJoin: "인플루언서 모드로 전환하여 참여하세요",
     joined: "참여 완료",
     yourLink: "제휴 링크",
     clicks: "클릭",
@@ -667,6 +1024,17 @@ const ko: AppText = {
     success: "성공",
     notAuthenticated: "인증되지 않았습니다",
     waiting: "대기중",
+    next: "다음",
+    back: "뒤로",
+    save: "저장",
+    cancel: "취소",
+    continue: "계속",
+    delete: "삭제",
+    confirm: "확인",
+    credits: "크레딧",
+    creditsPerUnit: "크레딧당",
+    popular: "인기",
+    processing: "처리중...",
   },
 };
 
@@ -691,7 +1059,7 @@ const ja: AppText = {
     ...en.onboarding,
     title: "役割を選択",
     subtitle: "Pipedをどのように使いますか？",
-    owner: "プロダクトオーナー",
+    owner: "メーカー",
     ownerDesc: "プロダクトを作り、AIでマーケティングを自動化したい。",
     influencer: "インフルエンサー",
     influencerDesc: "良い製品を見つけて宣伝し、コミッションを得たい。",
@@ -722,7 +1090,7 @@ const zh: AppText = {
     ...en.onboarding,
     title: "选择角色",
     subtitle: "您将如何使用Piped？",
-    owner: "产品所有者",
+    owner: "创客",
     ownerDesc: "我创建了产品，想用AI自动化营销。",
     influencer: "网红",
     influencerDesc: "我想发现好产品进行推广并赚取佣金。",

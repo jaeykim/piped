@@ -14,9 +14,10 @@ import { useLocale } from "@/context/locale-context";
 import type { Project } from "@/types/project";
 
 export default function DashboardPage() {
-  const { profile, activeRole } = useAuth();
+  const { profile } = useAuth();
   const { toast } = useToast();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const isKo = locale.startsWith("ko");
   const [projects, setProjects] = useState<Project[]>([]);
   const [stats, setStats] = useState({ projects: 0, campaigns: 0, affiliates: 0 });
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -84,22 +85,35 @@ export default function DashboardPage() {
 
   // Demo earnings data for chart (last 7 days)
   const demoChart = [
-    { day: "월", earnings: 12.5, clicks: 45 },
-    { day: "화", earnings: 8.0, clicks: 32 },
-    { day: "수", earnings: 23.5, clicks: 78 },
-    { day: "목", earnings: 15.0, clicks: 51 },
-    { day: "금", earnings: 31.0, clicks: 95 },
-    { day: "토", earnings: 18.5, clicks: 62 },
-    { day: "일", earnings: 22.0, clicks: 71 },
+    { day: isKo ? "월" : "Mon", earnings: 12.5, clicks: 45 },
+    { day: isKo ? "화" : "Tue", earnings: 8.0, clicks: 32 },
+    { day: isKo ? "수" : "Wed", earnings: 23.5, clicks: 78 },
+    { day: isKo ? "목" : "Thu", earnings: 15.0, clicks: 51 },
+    { day: isKo ? "금" : "Fri", earnings: 31.0, clicks: 95 },
+    { day: isKo ? "토" : "Sat", earnings: 18.5, clicks: 62 },
+    { day: isKo ? "일" : "Sun", earnings: 22.0, clicks: 71 },
   ];
   const maxEarning = Math.max(...demoChart.map((d) => d.earnings));
   const totalDemo = demoChart.reduce((s, d) => s + d.earnings, 0);
-  const totalClicks = demoChart.reduce((s, d) => s + d.clicks, 0);
-  const totalWithdrawn = 45.0; // demo withdrawn amount
 
-  // Seed demo affiliate programs for influencer role
+  // Demo campaign performance data for maker dashboard (last 7 days)
+  const demoPerformance = [
+    { day: isKo ? "월" : "Mon", impressions: 2400, clicks: 120, spend: 15 },
+    { day: isKo ? "화" : "Tue", impressions: 1800, clicks: 95, spend: 12 },
+    { day: isKo ? "수" : "Wed", impressions: 3200, clicks: 180, spend: 22 },
+    { day: isKo ? "목" : "Thu", impressions: 2100, clicks: 110, spend: 14 },
+    { day: isKo ? "금" : "Fri", impressions: 4100, clicks: 230, spend: 28 },
+    { day: isKo ? "토" : "Sat", impressions: 2800, clicks: 150, spend: 19 },
+    { day: isKo ? "일" : "Sun", impressions: 3500, clicks: 195, spend: 24 },
+  ];
+  const maxImpressions = Math.max(...demoPerformance.map((d) => d.impressions));
+  const totalImpressions = demoPerformance.reduce((s, d) => s + d.impressions, 0);
+  const totalPerfClicks = demoPerformance.reduce((s, d) => s + d.clicks, 0);
+  const totalSpend = demoPerformance.reduce((s, d) => s + d.spend, 0);
+  const avgCTR = ((totalPerfClicks / totalImpressions) * 100).toFixed(2);
+
+  // Seed demo affiliate programs
   useEffect(() => {
-    if (activeRole !== "influencer") return;
     async function seedIfEmpty() {
       try {
         const { collection: col, getDocs: gd, query: q, where: w } = await import("firebase/firestore");
@@ -111,87 +125,19 @@ export default function DashboardPage() {
       } catch { /* silent */ }
     }
     seedIfEmpty();
-  }, [activeRole]);
-
-  if (activeRole === "influencer") {
-    return (
-      <div className="mx-auto max-w-5xl">
-        <h1 className="text-2xl font-bold text-gray-900">내 수익</h1>
-        <p className="mt-1 text-sm text-gray-500">제휴 프로그램 수익 현황</p>
-
-        {/* Stats cards */}
-        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { label: "총 수익", value: `$${totalDemo.toFixed(2)}`, color: "bg-green-50 text-green-600", icon: TrendingUp },
-            { label: "출금 완료", value: `$${totalWithdrawn.toFixed(2)}`, color: "bg-indigo-50 text-indigo-600", icon: FolderKanban },
-            { label: "출금 가능", value: `$${(totalDemo - totalWithdrawn).toFixed(2)}`, color: "bg-orange-50 text-orange-600", icon: Users },
-            { label: "이번 주 클릭", value: totalClicks.toString(), color: "bg-blue-50 text-blue-600", icon: Megaphone },
-          ].map((stat) => {
-            const Icon = stat.icon;
-            return (
-              <Card key={stat.label}>
-                <CardContent className="flex items-center gap-3 py-4">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${stat.color}`}>
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className="text-xl font-bold text-gray-900">{stat.value}</p>
-                    <p className="text-xs text-gray-500">{stat.label}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-
-        {/* Earnings chart */}
-        <Card className="mt-6">
-          <CardContent className="py-5">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-700">주간 수익</h2>
-              <Link href="/affiliates/earnings" className="text-xs text-indigo-600 hover:text-indigo-800">
-                상세보기 →
-              </Link>
-            </div>
-            <div className="mt-4 flex items-end gap-2" style={{ height: 160 }}>
-              {demoChart.map((d) => (
-                <div key={d.day} className="flex flex-1 flex-col items-center gap-1">
-                  <span className="text-[10px] font-medium text-green-600">${d.earnings.toFixed(0)}</span>
-                  <div
-                    className="w-full rounded-t-md bg-gradient-to-t from-indigo-500 to-indigo-400 transition-all"
-                    style={{ height: `${(d.earnings / maxEarning) * 120}px`, minHeight: 8 }}
-                  />
-                  <span className="text-[10px] text-gray-400">{d.day}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Quick links — only earnings related */}
-        <div className="mt-6 grid gap-3 sm:grid-cols-2">
-          <Link href="/affiliates/my-programs">
-            <Card className="p-5 hover:shadow-md transition-shadow hover:border-green-200">
-              <TrendingUp className="h-6 w-6 text-green-600" />
-              <p className="mt-2 font-semibold text-gray-900">내 프로그램</p>
-              <p className="text-xs text-gray-500">레퍼럴 링크 관리 & 전환 테스트</p>
-            </Card>
-          </Link>
-          <Link href="/affiliates/earnings">
-            <Card className="p-5 hover:shadow-md transition-shadow hover:border-orange-200">
-              <Megaphone className="h-6 w-6 text-orange-600" />
-              <p className="mt-2 font-semibold text-gray-900">정산 & 출금</p>
-              <p className="text-xs text-gray-500">수익 확인 & 출금 요청</p>
-            </Card>
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  }, []);
 
   return (
     <div>
-      <div className="flex items-center justify-between">
+      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+        <p className="text-xs text-amber-700">
+          {isKo
+            ? "💡 아래 수익 및 지출 데이터는 예시입니다. 캠페인을 런칭하면 실제 성과로 대체됩니다."
+            : "💡 The earnings and spend data below is for demonstration. It will be replaced with real metrics once you launch a campaign."}
+        </p>
+      </div>
+
+      <div className="mt-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{t.dashboard.title}</h1>
           <p className="mt-1 text-gray-600">
@@ -207,11 +153,12 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats */}
-      <div className="mt-8 grid gap-4 sm:grid-cols-3">
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { label: t.dashboard.projectCount, value: stats.projects, icon: FolderKanban, color: "bg-indigo-100 text-indigo-600" },
           { label: t.dashboard.campaignCount, value: stats.campaigns, icon: Megaphone, color: "bg-blue-100 text-blue-600" },
           { label: t.dashboard.affiliateCount, value: stats.affiliates, icon: Users, color: "bg-green-100 text-green-600" },
+          { label: isKo ? "총 수익" : "Total Earnings", value: `$${totalDemo.toFixed(2)}`, icon: TrendingUp, color: "bg-green-50 text-green-600" },
         ].map((stat) => {
           const Icon = stat.icon;
           return (
@@ -231,6 +178,80 @@ export default function DashboardPage() {
           );
         })}
       </div>
+
+      {/* Affiliate Earnings — show first, only if earnings exist */}
+      {totalDemo > 0 && (
+      <div className="mt-8">
+        <h2 className="text-lg font-semibold text-gray-900">
+          {isKo ? "제휴 수익" : "Affiliate Earnings"}
+        </h2>
+        <Card className="mt-4">
+          <CardContent className="py-5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-700">{isKo ? "주간 수익" : "Weekly Earnings"}</h3>
+              <Link href="/affiliates/earnings" className="text-xs text-indigo-600 hover:text-indigo-800">
+                {isKo ? "상세보기 →" : "Details →"}
+              </Link>
+            </div>
+            <div className="mt-4 flex items-end gap-2" style={{ height: 140 }}>
+              {demoChart.map((d) => (
+                <div key={d.day} className="flex flex-1 flex-col items-center gap-1">
+                  <span className="text-[10px] font-medium text-green-600">${d.earnings.toFixed(0)}</span>
+                  <div
+                    className="w-full rounded-t-md bg-gradient-to-t from-green-500 to-green-400 transition-all"
+                    style={{ height: `${(d.earnings / maxEarning) * 110}px`, minHeight: 6 }}
+                  />
+                  <span className="text-[10px] text-gray-400">{d.day}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      )}
+
+      {/* Campaign Spend — only if spend exists */}
+      {totalSpend > 0 && (
+      <div className="mt-8">
+        <h2 className="text-lg font-semibold text-gray-900">
+          {isKo ? "캠페인 지출" : "Campaign Spend"}
+        </h2>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-4">
+          {[
+            { label: isKo ? "총 노출" : "Impressions", value: totalImpressions.toLocaleString() },
+            { label: isKo ? "총 클릭" : "Clicks", value: totalPerfClicks.toLocaleString() },
+            { label: isKo ? "총 지출" : "Spend", value: `$${totalSpend}` },
+            { label: isKo ? "평균 CTR" : "Avg CTR", value: `${avgCTR}%` },
+          ].map((s) => (
+            <div key={s.label} className="rounded-lg bg-gray-50 px-4 py-3">
+              <p className="text-xl font-bold text-gray-900">{s.value}</p>
+              <p className="text-xs text-gray-500">{s.label}</p>
+            </div>
+          ))}
+        </div>
+
+        <Card className="mt-4">
+          <CardContent className="py-5">
+            <h3 className="text-sm font-semibold text-gray-700">
+              {isKo ? "주간 지출" : "Weekly Spend"}
+            </h3>
+            <div className="mt-4 flex items-end gap-2" style={{ height: 140 }}>
+              {demoPerformance.map((d) => (
+                <div key={d.day} className="flex flex-1 flex-col items-center gap-1">
+                  <span className="text-[10px] font-medium text-indigo-600">${d.spend}</span>
+                  <div
+                    className="w-full rounded-t-md bg-gradient-to-t from-indigo-600 to-indigo-400 transition-all"
+                    style={{ height: `${(d.impressions / maxImpressions) * 110}px`, minHeight: 6 }}
+                  />
+                  <span className="text-[10px] text-gray-400">{d.day}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      )}
 
       {/* Recent Projects */}
       <div className="mt-8">
