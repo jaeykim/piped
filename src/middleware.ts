@@ -13,6 +13,7 @@ export function middleware(request: NextRequest) {
     pathname.startsWith("/api/auth/") ||
     pathname.startsWith("/api/payments/webhook") ||
     pathname.startsWith("/api/affiliates/track") ||
+    pathname.startsWith("/api/affiliates/convert") ||
     pathname.includes(".")
   ) {
     return NextResponse.next();

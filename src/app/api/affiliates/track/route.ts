@@ -23,6 +23,15 @@ export async function GET(request: NextRequest) {
     const linkDoc = linksSnap.docs[0];
     const linkData = linkDoc.data();
 
+    // Get cookie duration from program
+    let cookieDays = 30;
+    try {
+      const programSnap = await adminDb.doc(`affiliatePrograms/${linkData.programId}`).get();
+      if (programSnap.exists) {
+        cookieDays = programSnap.data()?.cookieDurationDays || 30;
+      }
+    } catch { /* use default */ }
+
     // Record click event
     await adminDb.collection("affiliateEvents").add({
       linkId: linkDoc.id,
@@ -33,16 +42,24 @@ export async function GET(request: NextRequest) {
     });
 
     // Increment click counter
-    await linkDoc.ref.update({
-      clicks: FieldValue.increment(1),
-    });
+    await linkDoc.ref.update({ clicks: FieldValue.increment(1) });
 
-    // Redirect to destination
+    // Redirect with referral cookie
     const destinationUrl = linkData.destinationUrl || "/";
     const separator = destinationUrl.includes("?") ? "&" : "?";
     const redirectUrl = `${destinationUrl}${separator}ref=${code}`;
 
-    return NextResponse.redirect(redirectUrl, 302);
+    const response = NextResponse.redirect(redirectUrl, 302);
+
+    // Set referral cookie (lasts for cookieDuration days)
+    response.cookies.set("piped_ref", code, {
+      maxAge: cookieDays * 24 * 60 * 60,
+      path: "/",
+      httpOnly: false, // readable by client JS for conversion tracking
+      sameSite: "lax",
+    });
+
+    return response;
   } catch (error) {
     console.error("Tracking error:", error);
     return NextResponse.redirect("/", 302);

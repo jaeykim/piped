@@ -36,5 +36,20 @@ export interface AffiliateEvent {
   type: "click" | "conversion";
   conversionValue?: number;
   commission?: number;
+  eventType?: string;
   createdAt: Date;
+}
+
+export type PayoutStatus = "pending" | "approved" | "paid" | "rejected";
+
+export interface PayoutRequest {
+  id: string;
+  influencerId: string;
+  amount: number;
+  status: PayoutStatus;
+  paymentMethod?: string; // bank_transfer, paypal, etc.
+  paymentDetails?: string; // account info
+  note?: string;
+  createdAt: Date;
+  processedAt?: Date;
 }
