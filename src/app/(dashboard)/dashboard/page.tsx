@@ -116,10 +116,8 @@ export default function DashboardPage() {
   if (activeRole === "influencer") {
     return (
       <div className="mx-auto max-w-5xl">
-        <h1 className="text-2xl font-bold text-gray-900">
-          {t.dashboard.welcomeInfluencer}, {profile?.displayName}
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">{t.dashboard.influencerDesc}</p>
+        <h1 className="text-2xl font-bold text-gray-900">내 수익</h1>
+        <p className="mt-1 text-sm text-gray-500">제휴 프로그램 수익 현황</p>
 
         {/* Stats cards */}
         <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -149,7 +147,12 @@ export default function DashboardPage() {
         {/* Earnings chart */}
         <Card className="mt-6">
           <CardContent className="py-5">
-            <h2 className="text-sm font-semibold text-gray-700">주간 수익</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-gray-700">주간 수익</h2>
+              <Link href="/affiliates/earnings" className="text-xs text-indigo-600 hover:text-indigo-800">
+                상세보기 →
+              </Link>
+            </div>
             <div className="mt-4 flex items-end gap-2" style={{ height: 160 }}>
               {demoChart.map((d) => (
                 <div key={d.day} className="flex flex-1 flex-col items-center gap-1">
@@ -165,27 +168,20 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Quick links */}
-        <div className="mt-6 grid gap-3 sm:grid-cols-3">
-          <Link href="/affiliates">
-            <Card className="p-5 hover:shadow-md transition-shadow hover:border-indigo-200">
-              <FolderKanban className="h-6 w-6 text-indigo-600" />
-              <p className="mt-2 font-semibold text-gray-900">{t.dashboard.browsePrograms}</p>
-              <p className="text-xs text-gray-500">{t.dashboard.findProducts}</p>
-            </Card>
-          </Link>
+        {/* Quick links — only earnings related */}
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
           <Link href="/affiliates/my-programs">
             <Card className="p-5 hover:shadow-md transition-shadow hover:border-green-200">
               <TrendingUp className="h-6 w-6 text-green-600" />
               <p className="mt-2 font-semibold text-gray-900">내 프로그램</p>
-              <p className="text-xs text-gray-500">레퍼럴 링크 & 테스트 전환</p>
+              <p className="text-xs text-gray-500">레퍼럴 링크 관리 & 전환 테스트</p>
             </Card>
           </Link>
           <Link href="/affiliates/earnings">
             <Card className="p-5 hover:shadow-md transition-shadow hover:border-orange-200">
-              <Users className="h-6 w-6 text-orange-600" />
-              <p className="mt-2 font-semibold text-gray-900">{t.dashboard.myEarnings}</p>
-              <p className="text-xs text-gray-500">정산 요청 & 출금</p>
+              <Megaphone className="h-6 w-6 text-orange-600" />
+              <p className="mt-2 font-semibold text-gray-900">정산 & 출금</p>
+              <p className="text-xs text-gray-500">수익 확인 & 출금 요청</p>
             </Card>
           </Link>
         </div>
