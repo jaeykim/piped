@@ -114,12 +114,100 @@ export async function createMetaCampaign(config: MetaCampaignConfig) {
   };
 }
 
+// ─── Image Upload ───
+
+export async function uploadAdImage(
+  adAccountId: string,
+  accessToken: string,
+  imageBase64: string
+): Promise<string> {
+  // Meta requires multipart form upload for images
+  const formData = new FormData();
+  formData.append("access_token", accessToken);
+
+  // Convert base64 to blob
+  const binary = Buffer.from(imageBase64, "base64");
+  const blob = new Blob([binary], { type: "image/png" });
+  formData.append("filename", blob, "ad-creative.png");
+
+  const response = await fetch(
+    `${META_BASE_URL}/act_${adAccountId}/adimages`,
+    { method: "POST", body: formData }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || "Image upload failed");
+  }
+
+  const data = await response.json();
+  // Response: { images: { "ad-creative.png": { hash: "...", url: "..." } } }
+  const imageData = Object.values(data.images || {})[0] as { hash: string; url: string };
+  return imageData?.hash || "";
+}
+
+// ─── Full Campaign with Image Upload ───
+
+export async function createMetaCampaignWithImage(
+  config: MetaCampaignConfig & { imageBase64?: string }
+) {
+  const { accessToken, adAccountId } = config;
+
+  let imageUrl = config.adCreativeUrl;
+
+  // Upload image if base64 provided
+  if (config.imageBase64) {
+    const imageHash = await uploadAdImage(adAccountId, accessToken, config.imageBase64);
+    // Use image_hash instead of image_url in creative
+    const campaign = await metaApiCall(`/act_${adAccountId}/campaigns`, accessToken, {
+      name: config.name, objective: config.objective, status: "PAUSED", special_ad_categories: [],
+    });
+
+    const adSet = await metaApiCall(`/act_${adAccountId}/adsets`, accessToken, {
+      name: `${config.name} - Ad Set`, campaign_id: campaign.id,
+      daily_budget: config.dailyBudget * 100, billing_event: "IMPRESSIONS",
+      optimization_goal: "LINK_CLICKS", status: "PAUSED",
+      targeting: {
+        age_min: config.targeting.ageMin, age_max: config.targeting.ageMax,
+        genders: config.targeting.genders, geo_locations: config.targeting.geoLocations,
+        flexible_spec: config.targeting.interests ? [{ interests: config.targeting.interests }] : undefined,
+      },
+    });
+
+    const creative = await metaApiCall(`/act_${adAccountId}/adcreatives`, accessToken, {
+      name: `${config.name} - Creative`,
+      object_story_spec: {
+        link_data: {
+          image_hash: imageHash,
+          link: config.destinationUrl,
+          message: config.primaryText,
+          name: config.headline,
+          description: config.linkDescription,
+        },
+      },
+    });
+
+    const ad = await metaApiCall(`/act_${adAccountId}/ads`, accessToken, {
+      name: `${config.name} - Ad`, adset_id: adSet.id,
+      creative: { creative_id: creative.id }, status: "PAUSED",
+    });
+
+    return { campaignId: campaign.id, adSetId: adSet.id, creativeId: creative.id, adId: ad.id };
+  }
+
+  // Fallback: use URL-based creative (existing flow)
+  return createMetaCampaign(config);
+}
+
+// ─── Metrics ───
+
 export async function getMetaCampaignMetrics(
   campaignId: string,
   accessToken: string
 ) {
+  const fields = "impressions,clicks,spend,ctr,cpc,actions,cost_per_action_type";
   const response = await fetch(
-    `${META_BASE_URL}/${campaignId}/insights?fields=impressions,clicks,spend,actions&access_token=${accessToken}`
+    `${META_BASE_URL}/${campaignId}/insights?fields=${fields}&access_token=${accessToken}`
   );
 
   if (!response.ok) {
@@ -128,14 +216,62 @@ export async function getMetaCampaignMetrics(
 
   const data = await response.json();
   const insights = data.data?.[0] || {};
+  const actions = insights.actions || [];
+  const costPerAction = insights.cost_per_action_type || [];
+
+  const conversions = actions.find(
+    (a: { action_type: string }) => a.action_type === "offsite_conversion"
+  )?.value || 0;
+  const cpa = costPerAction.find(
+    (a: { action_type: string }) => a.action_type === "offsite_conversion"
+  )?.value || 0;
 
   return {
     impressions: parseInt(insights.impressions || "0"),
     clicks: parseInt(insights.clicks || "0"),
     spend: parseFloat(insights.spend || "0"),
-    conversions:
-      insights.actions?.find(
-        (a: { action_type: string }) => a.action_type === "offsite_conversion"
-      )?.value || 0,
+    ctr: parseFloat(insights.ctr || "0"),
+    cpc: parseFloat(insights.cpc || "0"),
+    conversions: parseInt(conversions),
+    cpa: parseFloat(cpa),
+    roas: parseFloat(insights.spend) > 0 && conversions > 0
+      ? (conversions * 50) / parseFloat(insights.spend) // estimated ROAS
+      : 0,
   };
+}
+
+// ─── Ad Control ───
+
+export async function updateAdStatus(
+  adId: string,
+  accessToken: string,
+  status: "ACTIVE" | "PAUSED" | "ARCHIVED"
+) {
+  const response = await fetch(`${META_BASE_URL}/${adId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status, access_token: accessToken }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || "Failed to update ad status");
+  }
+  return response.json();
+}
+
+// ─── List Campaigns ───
+
+export async function listCampaigns(
+  adAccountId: string,
+  accessToken: string
+) {
+  const fields = "name,status,objective,daily_budget,created_time";
+  const response = await fetch(
+    `${META_BASE_URL}/act_${adAccountId}/campaigns?fields=${fields}&access_token=${accessToken}`
+  );
+
+  if (!response.ok) throw new Error("Failed to list campaigns");
+  const data = await response.json();
+  return data.data || [];
 }

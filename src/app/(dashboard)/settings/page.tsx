@@ -22,17 +22,24 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [connectingGoogle, setConnectingGoogle] = useState(false);
 
-  // Handle OAuth callback result
+  // Handle OAuth callback results
   useEffect(() => {
     const googleAdsResult = searchParams.get("google_ads");
+    const metaAdsResult = searchParams.get("meta_ads");
     if (googleAdsResult === "success") {
       toast("success", t.settings.googleConnected);
       refreshProfile();
-      // Clean up URL
       window.history.replaceState({}, "", "/settings");
     } else if (googleAdsResult === "error") {
-      const reason = searchParams.get("reason") || "unknown";
-      toast("error", `${t.settings.googleFailed}: ${reason}`);
+      toast("error", `${t.settings.googleFailed}: ${searchParams.get("reason") || "unknown"}`);
+      window.history.replaceState({}, "", "/settings");
+    }
+    if (metaAdsResult === "success") {
+      toast("success", "Meta Ads 계정이 연결되었습니다!");
+      refreshProfile();
+      window.history.replaceState({}, "", "/settings");
+    } else if (metaAdsResult === "error") {
+      toast("error", `Meta Ads 연결 실패: ${searchParams.get("reason") || "unknown"}`);
       window.history.replaceState({}, "", "/settings");
     }
   }, [searchParams, toast, refreshProfile]);
@@ -247,7 +254,13 @@ export default function SettingsPage() {
               {metaConnected ? (
                 <Badge variant="success">{t.settings.connected}</Badge>
               ) : (
-                <Button size="sm" variant="outline">
+                <Button size="sm" variant="outline" onClick={async () => {
+                  try {
+                    const token = await getAuth_().currentUser?.getIdToken();
+                    const res = await fetch("/api/auth/meta-ads", { headers: { Authorization: `Bearer ${token}` } });
+                    if (res.ok) { const { authUrl } = await res.json(); window.location.href = authUrl; }
+                  } catch { toast("error", t.settings.connectFailed); }
+                }}>
                   {t.settings.connect}
                 </Button>
               )}

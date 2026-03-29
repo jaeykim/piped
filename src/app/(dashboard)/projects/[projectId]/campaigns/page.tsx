@@ -113,36 +113,20 @@ export default function CampaignsPage() {
                 </div>
 
                 {campaign.metrics && (
-                  <div className="mt-4 grid grid-cols-4 gap-4">
+                  <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-6">
                     {[
-                      {
-                        label: "Impressions",
-                        value: campaign.metrics.impressions.toLocaleString(),
-                        icon: Eye,
-                      },
-                      {
-                        label: "Clicks",
-                        value: campaign.metrics.clicks.toLocaleString(),
-                        icon: MousePointer,
-                      },
-                      {
-                        label: "Spend",
-                        value: `$${campaign.metrics.spend.toFixed(2)}`,
-                        icon: DollarSign,
-                      },
-                      {
-                        label: "Conversions",
-                        value: campaign.metrics.conversions.toString(),
-                        icon: TrendingUp,
-                      },
+                      { label: "노출", value: campaign.metrics.impressions.toLocaleString(), icon: Eye },
+                      { label: "클릭", value: campaign.metrics.clicks.toLocaleString(), icon: MousePointer },
+                      { label: "CTR", value: `${(campaign.metrics.ctr || 0).toFixed(2)}%`, icon: MousePointer },
+                      { label: "지출", value: `$${campaign.metrics.spend.toFixed(2)}`, icon: DollarSign },
+                      { label: "CPC", value: `$${(campaign.metrics.cpc || 0).toFixed(2)}`, icon: DollarSign },
+                      { label: "전환", value: campaign.metrics.conversions.toString(), icon: TrendingUp },
                     ].map((stat) => {
                       const Icon = stat.icon;
                       return (
                         <div key={stat.label} className="text-center">
                           <Icon className="mx-auto h-4 w-4 text-gray-400" />
-                          <p className="mt-1 text-lg font-semibold text-gray-900">
-                            {stat.value}
-                          </p>
+                          <p className="mt-1 text-lg font-semibold text-gray-900">{stat.value}</p>
                           <p className="text-xs text-gray-500">{stat.label}</p>
                         </div>
                       );
