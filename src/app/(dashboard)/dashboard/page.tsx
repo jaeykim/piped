@@ -82,38 +82,107 @@ export default function DashboardPage() {
     affiliates: "success",
   };
 
+  // Demo earnings data for chart (last 7 days)
+  const demoChart = [
+    { day: "월", earnings: 12.5, clicks: 45 },
+    { day: "화", earnings: 8.0, clicks: 32 },
+    { day: "수", earnings: 23.5, clicks: 78 },
+    { day: "목", earnings: 15.0, clicks: 51 },
+    { day: "금", earnings: 31.0, clicks: 95 },
+    { day: "토", earnings: 18.5, clicks: 62 },
+    { day: "일", earnings: 22.0, clicks: 71 },
+  ];
+  const maxEarning = Math.max(...demoChart.map((d) => d.earnings));
+  const totalDemo = demoChart.reduce((s, d) => s + d.earnings, 0);
+  const totalClicks = demoChart.reduce((s, d) => s + d.clicks, 0);
+  const totalWithdrawn = 45.0; // demo withdrawn amount
+
   if (activeRole === "influencer") {
+    // Seed demo programs on first load
+    useEffect(() => {
+      async function seedIfEmpty() {
+        const { collection: col, getDocs: gd, query: q, where: w } = await import("firebase/firestore");
+        const snap = await gd(q(col(getDb(), "affiliatePrograms"), w("status", "==", "active")));
+        if (snap.empty) {
+          const token = await getAuth_().currentUser?.getIdToken();
+          if (token) await fetch("/api/affiliates/seed", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+        }
+      }
+      seedIfEmpty();
+    }, []);
+
     return (
-      <div>
+      <div className="mx-auto max-w-5xl">
         <h1 className="text-2xl font-bold text-gray-900">
           {t.dashboard.welcomeInfluencer}, {profile?.displayName}
         </h1>
-        <p className="mt-2 text-gray-600">{t.dashboard.influencerDesc}</p>
-        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+        <p className="mt-1 text-sm text-gray-500">{t.dashboard.influencerDesc}</p>
+
+        {/* Stats cards */}
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { label: "총 수익", value: `$${totalDemo.toFixed(2)}`, color: "bg-green-50 text-green-600", icon: TrendingUp },
+            { label: "출금 완료", value: `$${totalWithdrawn.toFixed(2)}`, color: "bg-indigo-50 text-indigo-600", icon: FolderKanban },
+            { label: "출금 가능", value: `$${(totalDemo - totalWithdrawn).toFixed(2)}`, color: "bg-orange-50 text-orange-600", icon: Users },
+            { label: "이번 주 클릭", value: totalClicks.toString(), color: "bg-blue-50 text-blue-600", icon: Megaphone },
+          ].map((stat) => {
+            const Icon = stat.icon;
+            return (
+              <Card key={stat.label}>
+                <CardContent className="flex items-center gap-3 py-4">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${stat.color}`}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold text-gray-900">{stat.value}</p>
+                    <p className="text-xs text-gray-500">{stat.label}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Earnings chart */}
+        <Card className="mt-6">
+          <CardContent className="py-5">
+            <h2 className="text-sm font-semibold text-gray-700">주간 수익</h2>
+            <div className="mt-4 flex items-end gap-2" style={{ height: 160 }}>
+              {demoChart.map((d) => (
+                <div key={d.day} className="flex flex-1 flex-col items-center gap-1">
+                  <span className="text-[10px] font-medium text-green-600">${d.earnings.toFixed(0)}</span>
+                  <div
+                    className="w-full rounded-t-md bg-gradient-to-t from-indigo-500 to-indigo-400 transition-all"
+                    style={{ height: `${(d.earnings / maxEarning) * 120}px`, minHeight: 8 }}
+                  />
+                  <span className="text-[10px] text-gray-400">{d.day}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Quick links */}
+        <div className="mt-6 grid gap-3 sm:grid-cols-3">
           <Link href="/affiliates">
-            <Card className="p-6 hover:shadow-md transition-shadow">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-100">
-                  <FolderKanban className="h-6 w-6 text-indigo-600" />
-                </div>
-                <div>
-                  <p className="font-semibold text-gray-900">{t.dashboard.browsePrograms}</p>
-                  <p className="text-sm text-gray-600">{t.dashboard.findProducts}</p>
-                </div>
-              </div>
+            <Card className="p-5 hover:shadow-md transition-shadow hover:border-indigo-200">
+              <FolderKanban className="h-6 w-6 text-indigo-600" />
+              <p className="mt-2 font-semibold text-gray-900">{t.dashboard.browsePrograms}</p>
+              <p className="text-xs text-gray-500">{t.dashboard.findProducts}</p>
+            </Card>
+          </Link>
+          <Link href="/affiliates/my-programs">
+            <Card className="p-5 hover:shadow-md transition-shadow hover:border-green-200">
+              <TrendingUp className="h-6 w-6 text-green-600" />
+              <p className="mt-2 font-semibold text-gray-900">내 프로그램</p>
+              <p className="text-xs text-gray-500">레퍼럴 링크 & 테스트 전환</p>
             </Card>
           </Link>
           <Link href="/affiliates/earnings">
-            <Card className="p-6 hover:shadow-md transition-shadow">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-100">
-                  <TrendingUp className="h-6 w-6 text-green-600" />
-                </div>
-                <div>
-                  <p className="font-semibold text-gray-900">{t.dashboard.myEarnings}</p>
-                  <p className="text-sm text-gray-600">{t.dashboard.trackCommissions}</p>
-                </div>
-              </div>
+            <Card className="p-5 hover:shadow-md transition-shadow hover:border-orange-200">
+              <Users className="h-6 w-6 text-orange-600" />
+              <p className="mt-2 font-semibold text-gray-900">{t.dashboard.myEarnings}</p>
+              <p className="text-xs text-gray-500">정산 요청 & 출금</p>
             </Card>
           </Link>
         </div>

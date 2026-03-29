@@ -104,6 +104,8 @@ export default function SettingsPage() {
   const metaConnected = !!profile?.integrations?.meta?.accessToken;
   const googleConnected = !!profile?.integrations?.google?.refreshToken;
   const [buyingPack, setBuyingPack] = useState<string | null>(null);
+  const [cryptoNetwork, setCryptoNetwork] = useState((profile as Record<string, unknown>)?.payoutSettings?.cryptoNetwork as string || "ethereum");
+  const [cryptoAddress, setCryptoAddress] = useState((profile as Record<string, unknown>)?.payoutSettings?.cryptoAddress as string || "");
 
   const creditPacks: Record<string, number> = { starter: 100, growth: 500, pro: 1000 };
 
@@ -301,6 +303,58 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Crypto Wallet (for affiliate payouts) */}
+      <Card className="mt-6">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Link className="h-5 w-5 text-gray-600" />
+            <h2 className="font-semibold text-gray-900">정산 수령 주소</h2>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-gray-500">제휴 수익을 수령할 크립토 지갑 주소를 입력하세요</p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">네트워크</label>
+            <select
+              value={cryptoNetwork}
+              onChange={(e) => setCryptoNetwork(e.target.value)}
+              className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+            >
+              <option value="ethereum">Ethereum (ETH / USDT / USDC)</option>
+              <option value="polygon">Polygon (MATIC / USDT / USDC)</option>
+              <option value="solana">Solana (SOL / USDC)</option>
+              <option value="base">Base (ETH / USDC)</option>
+              <option value="bitcoin">Bitcoin (BTC)</option>
+            </select>
+          </div>
+          <Input
+            label="지갑 주소"
+            value={cryptoAddress}
+            onChange={(e) => setCryptoAddress(e.target.value)}
+            placeholder="0x... 또는 지갑 주소 입력"
+          />
+          <Button
+            size="sm"
+            onClick={async () => {
+              if (!profile || !cryptoAddress.trim()) return;
+              try {
+                await updateDoc(doc(getDb(), "users", profile.uid), {
+                  "payoutSettings.cryptoNetwork": cryptoNetwork,
+                  "payoutSettings.cryptoAddress": cryptoAddress.trim(),
+                  updatedAt: serverTimestamp(),
+                });
+                await refreshProfile();
+                toast("success", "지갑 주소가 저장되었습니다");
+              } catch {
+                toast("error", "저장 실패");
+              }
+            }}
+          >
+            저장
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Security */}
       <Card className="mt-6">
