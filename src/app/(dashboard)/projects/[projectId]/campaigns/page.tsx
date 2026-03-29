@@ -208,7 +208,7 @@ export default function CampaignsPage() {
                     {campaign.platform === "meta" && campaign.platformCampaignId && (
                       <Button
                         size="sm"
-                        variant={campaign.status === "active" ? "outline" : "default"}
+                        variant={campaign.status === "active" ? "outline" : "primary"}
                         onClick={() => handleToggleAd(campaign)}
                       >
                         {campaign.status === "active" ? (
