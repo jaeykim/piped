@@ -225,9 +225,9 @@ export default function CampaignsPage() {
                       {[
                         { label: "노출", value: campaign.metrics.impressions.toLocaleString() },
                         { label: "클릭", value: campaign.metrics.clicks.toLocaleString() },
-                        { label: "CTR", value: `${((campaign.metrics as Record<string, number>).ctr || 0).toFixed(2)}%` },
+                        { label: "CTR", value: `${((campaign.metrics as unknown as Record<string, number>).ctr || 0).toFixed(2)}%` },
                         { label: "지출", value: `$${campaign.metrics.spend.toFixed(2)}` },
-                        { label: "CPC", value: `$${((campaign.metrics as Record<string, number>).cpc || 0).toFixed(2)}` },
+                        { label: "CPC", value: `$${((campaign.metrics as unknown as Record<string, number>).cpc || 0).toFixed(2)}` },
                         { label: "전환", value: campaign.metrics.conversions.toString() },
                       ].map((s) => (
                         <div key={s.label} className="text-center">
