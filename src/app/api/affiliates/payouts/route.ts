@@ -30,8 +30,8 @@ export async function GET(request: NextRequest) {
 
     const totalEarnings = linksSnap.docs.reduce((sum, d) => sum + (d.data().earnings || 0), 0);
     const paidOrPending = payouts
-      .filter((p) => (p as { status: string }).status !== "rejected")
-      .reduce((sum, p) => sum + ((p as { amount: number }).amount || 0), 0);
+      .filter((p) => (p as unknown as { status: string }).status !== "rejected")
+      .reduce((sum, p) => sum + ((p as unknown as { amount: number }).amount || 0), 0);
 
     const availableBalance = totalEarnings - paidOrPending;
 
