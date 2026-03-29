@@ -97,20 +97,23 @@ export default function DashboardPage() {
   const totalClicks = demoChart.reduce((s, d) => s + d.clicks, 0);
   const totalWithdrawn = 45.0; // demo withdrawn amount
 
-  if (activeRole === "influencer") {
-    // Seed demo programs on first load
-    useEffect(() => {
-      async function seedIfEmpty() {
+  // Seed demo affiliate programs for influencer role
+  useEffect(() => {
+    if (activeRole !== "influencer") return;
+    async function seedIfEmpty() {
+      try {
         const { collection: col, getDocs: gd, query: q, where: w } = await import("firebase/firestore");
         const snap = await gd(q(col(getDb(), "affiliatePrograms"), w("status", "==", "active")));
         if (snap.empty) {
           const token = await getAuth_().currentUser?.getIdToken();
           if (token) await fetch("/api/affiliates/seed", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
         }
-      }
-      seedIfEmpty();
-    }, []);
+      } catch { /* silent */ }
+    }
+    seedIfEmpty();
+  }, [activeRole]);
 
+  if (activeRole === "influencer") {
     return (
       <div className="mx-auto max-w-5xl">
         <h1 className="text-2xl font-bold text-gray-900">
