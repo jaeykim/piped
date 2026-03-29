@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     const decoded = await adminAuth.verifyIdToken(token);
     const uid = decoded.uid;
 
-    const { projectId, size, platform, concept, subject, overlayText, language, country } = await request.json();
+    const { projectId, size, platform, concept, subject, overlayText, userImage, language, country } = await request.json();
 
     // Check credits (graphic-card is cheaper than AI photo)
     const creditAction = subject === "graphic-card" ? "creative-graphic" : "creative-ai";
@@ -168,13 +168,19 @@ export async function POST(request: NextRequest) {
 
       let cardData: string;
 
-      // Step 2: Try to add website screenshot as a device mockup
+      // Step 2: Try to add image to the card (user upload > screenshot > fallback)
       try {
         const [cw, ch] = (size as string).split("x").map(Number);
         let screenshotBuffer: Buffer | null = null;
 
-        // Fetch real website screenshot
-        if (websiteUrl) {
+        // Priority 1: User uploaded image
+        if (userImage) {
+          const base64 = userImage.split(",")[1];
+          if (base64) screenshotBuffer = Buffer.from(base64, "base64");
+        }
+
+        // Priority 2: Website screenshot
+        if (!screenshotBuffer && websiteUrl) {
           const ssRes = await fetch(
             `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(websiteUrl)}&category=PERFORMANCE&strategy=DESKTOP`,
             { signal: AbortSignal.timeout(12000) }

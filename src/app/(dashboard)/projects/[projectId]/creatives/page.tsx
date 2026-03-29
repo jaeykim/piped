@@ -120,6 +120,7 @@ export default function CreativesPage() {
   const [selectedConcept, setSelectedConcept] = useState<CreativeConcept | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<CreativeSubject>("graphic-card");
   const [selectedCopy, setSelectedCopy] = useState<string>("");
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null); // base64 data URL
   const [copyVariants, setCopyVariants] = useState<CopyVariant[]>([]);
   const [loadingCopy, setLoadingCopy] = useState(false);
 
@@ -241,6 +242,7 @@ export default function CreativesPage() {
           concept: selectedConcept,
           subject: selectedSubject,
           overlayText: selectedCopy || undefined,
+          userImage: uploadedImage || undefined,
           language: LANGUAGES.find((l) => l.code === selectedLanguage)?.label,
           country: COUNTRIES.find((c) => c.code === selectedCountry)?.label,
         }),
@@ -423,11 +425,21 @@ export default function CreativesPage() {
     }
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { toast("error", "5MB 이하 이미지만 업로드 가능합니다"); return; }
+    const reader = new FileReader();
+    reader.onload = () => setUploadedImage(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
   const handleReset = () => {
     setStep("output-type");
     setSelectedConcept(null);
     setSelectedSubject("graphic-card");
     setSelectedCopy("");
+    setUploadedImage(null);
     setCreative(null);
   };
 
@@ -782,6 +794,28 @@ export default function CreativesPage() {
             </p>
           </div>
         )}
+
+        {/* Image upload (optional) */}
+        <div className="mt-6">
+          <h2 className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
+            <Image className="h-4 w-4" />
+            이미지 업로드 (선택사항)
+          </h2>
+          <p className="mt-0.5 text-xs text-gray-400">제품 이미지를 업로드하면 광고 카드에 합성됩니다</p>
+          <div className="mt-2 flex items-center gap-3">
+            <label className="cursor-pointer rounded-lg border-2 border-dashed border-gray-300 px-4 py-3 text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors">
+              {uploadedImage ? "이미지 변경" : "이미지 선택"}
+              <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+            </label>
+            {uploadedImage && (
+              <div className="flex items-center gap-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={uploadedImage} alt="" className="h-12 w-12 rounded-lg object-cover border border-gray-200" />
+                <button onClick={() => setUploadedImage(null)} className="text-xs text-red-500 hover:text-red-700">삭제</button>
+              </div>
+            )}
+          </div>
+        </div>
 
         <div className="mt-8 flex items-center justify-between">
           <p className="text-sm text-gray-500">

@@ -71,6 +71,8 @@ function smartWrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
 export function CreativeEditor({ data, onClose }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [baseImg, setBaseImg] = useState<HTMLImageElement | null>(null);
+  const [overlayImg, setOverlayImg] = useState<HTMLImageElement | null>(null);
+  const [overlayPos, setOverlayPos] = useState({ x: 60, y: 55, size: 35 }); // percentage
   const [draggingLayer, setDraggingLayer] = useState<string | null>(null);
   const dragOffsetRef = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
 
@@ -127,6 +129,15 @@ export function CreativeEditor({ data, onClose }: Props) {
       botG.addColorStop(1, `rgba(0,0,0,${opacity * 0.5})`);
       ctx.fillStyle = botG;
       ctx.fillRect(0, h * 0.5, w, h * 0.5);
+    }
+
+    // Render overlay image if present
+    if (overlayImg) {
+      const oSize = (overlayPos.size / 100) * w;
+      const oX = (overlayPos.x / 100) * w;
+      const oY = (overlayPos.y / 100) * h;
+      const aspect = overlayImg.height / overlayImg.width;
+      ctx.drawImage(overlayImg, oX, oY, oSize, oSize * aspect);
     }
 
     // Render each visible layer
@@ -213,7 +224,7 @@ export function CreativeEditor({ data, onClose }: Props) {
         ctx.fillText(layer.text, lx + 8, ly + bh / 2);
       }
     }
-  }, [baseImg, layers, brightness, contrast, saturation, overlayOpacity, data]);
+  }, [baseImg, overlayImg, overlayPos, layers, brightness, contrast, saturation, overlayOpacity, data]);
 
   useEffect(() => { render(); }, [render]);
 
@@ -232,6 +243,19 @@ export function CreativeEditor({ data, onClose }: Props) {
     const mxPct = (mx / w) * 100;
     const myPct = (my / h) * 100;
 
+    // Check overlay image first
+    if (overlayImg) {
+      const oSize = (overlayPos.size / 100) * w;
+      const oX = (overlayPos.x / 100) * w;
+      const oY = (overlayPos.y / 100) * h;
+      const aspect = overlayImg.height / overlayImg.width;
+      if (mx >= oX && mx <= oX + oSize && my >= oY && my <= oY + oSize * aspect) {
+        dragOffsetRef.current = { dx: mxPct - overlayPos.x, dy: myPct - overlayPos.y };
+        setDraggingLayer("__overlay__");
+        return;
+      }
+    }
+
     for (let i = layers.length - 1; i >= 0; i--) {
       const l = layers[i];
       if (!l.visible) continue;
@@ -240,7 +264,6 @@ export function CreativeEditor({ data, onClose }: Props) {
       const hitW = w * 0.6;
       const hitH = w * 0.12;
       if (mx >= lx - 10 && mx <= lx + hitW && my >= ly - 10 && my <= ly + hitH) {
-        // Store offset between click point and layer origin
         dragOffsetRef.current = { dx: mxPct - l.x, dy: myPct - l.y };
         setDraggingLayer(l.id);
         return;
@@ -255,10 +278,13 @@ export function CreativeEditor({ data, onClose }: Props) {
     const rect = canvas.getBoundingClientRect();
     const px = ((e.clientX - rect.left) / rect.width) * 100;
     const py = ((e.clientY - rect.top) / rect.height) * 100;
-    // Apply offset so the layer stays at the same relative position to the cursor
     const newX = px - dragOffsetRef.current.dx;
     const newY = py - dragOffsetRef.current.dy;
-    updateLayer(draggingLayer, { x: Math.max(0, Math.min(90, newX)), y: Math.max(0, Math.min(95, newY)) });
+    if (draggingLayer === "__overlay__") {
+      setOverlayPos((prev) => ({ ...prev, x: Math.max(0, Math.min(90, newX)), y: Math.max(0, Math.min(90, newY)) }));
+    } else {
+      updateLayer(draggingLayer, { x: Math.max(0, Math.min(90, newX)), y: Math.max(0, Math.min(95, newY)) });
+    }
   };
 
   const handleCanvasMouseUp = () => { setDraggingLayer(null); };
@@ -340,6 +366,39 @@ export function CreativeEditor({ data, onClose }: Props) {
               )}
             </div>
           ))}
+        </div>
+
+        {/* Overlay image */}
+        <div className="mt-4 border-t border-gray-100 pt-3">
+          <h3 className="text-xs font-medium text-gray-700">이미지 삽입</h3>
+          <p className="text-[10px] text-gray-400">이미지를 업로드하면 캔버스에 드래그해서 배치할 수 있습니다</p>
+          <div className="mt-2 flex items-center gap-2">
+            <label className="cursor-pointer rounded border border-gray-200 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50">
+              {overlayImg ? "변경" : "업로드"}
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = () => {
+                  const img = new window.Image();
+                  img.onload = () => setOverlayImg(img);
+                  img.src = reader.result as string;
+                };
+                reader.readAsDataURL(file);
+              }} />
+            </label>
+            {overlayImg && (
+              <button onClick={() => setOverlayImg(null)} className="text-xs text-red-500">삭제</button>
+            )}
+          </div>
+          {overlayImg && (
+            <div className="mt-2">
+              <label className="text-[10px] text-gray-500">크기 {overlayPos.size}%</label>
+              <input type="range" min={10} max={80} value={overlayPos.size}
+                onChange={(e) => setOverlayPos((p) => ({ ...p, size: Number(e.target.value) }))}
+                className="w-full accent-indigo-600" />
+            </div>
+          )}
         </div>
 
         {/* Overlay opacity */}
