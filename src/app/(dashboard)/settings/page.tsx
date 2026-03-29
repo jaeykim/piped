@@ -1,7 +1,38 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+
+// Banksi pay button — dynamically imported to avoid SSR issues
+function CryptoPayButton({ amount, credits, onSuccess }: { amount: number; credits: number; onSuccess: (credits: number) => Promise<void> }) {
+  const [BanksiBtn, setBanksiBtn] = useState<React.ComponentType<Record<string, unknown>> | null>(null);
+
+  useEffect(() => {
+    import("banksi/react").then((mod) => {
+      setBanksiBtn(() => mod.BanksiPayButton);
+    }).catch(() => {});
+  }, []);
+
+  if (!BanksiBtn) {
+    return (
+      <button disabled className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-gray-200 bg-gray-50 px-4 py-4 text-base font-semibold text-gray-400">
+        🪙 크립토 결제 로딩중...
+      </button>
+    );
+  }
+
+  return (
+    <BanksiBtn
+      amount={amount}
+      apiKey={process.env.NEXT_PUBLIC_BANKSI_API_KEY || ""}
+      popup={true}
+      onPaymentConfirmed={() => onSuccess(credits)}
+      className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-gray-200 bg-white px-4 py-4 text-base font-semibold text-gray-900 transition-all hover:border-indigo-300 hover:shadow-md cursor-pointer"
+    >
+      🪙 크립토로 ${amount} 결제하기
+    </BanksiBtn>
+  );
+}
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { getDb, getAuth_ } from "@/lib/firebase/client";
 import { useAuth } from "@/context/auth-context";
@@ -103,27 +134,28 @@ export default function SettingsPage() {
 
   const metaConnected = !!profile?.integrations?.meta?.accessToken;
   const googleConnected = !!profile?.integrations?.google?.refreshToken;
+  const [selectedPack, setSelectedPack] = useState<string>("growth");
   const [buyingPack, setBuyingPack] = useState<string | null>(null);
   const payout = (profile as unknown as Record<string, Record<string, string>>)?.payoutSettings;
   const [cryptoNetwork, setCryptoNetwork] = useState(payout?.cryptoNetwork || "ethereum");
   const [cryptoAddress, setCryptoAddress] = useState(payout?.cryptoAddress || "");
 
-  const creditPacks: Record<string, number> = { starter: 100, growth: 500, pro: 1000 };
-
   const handleBuyCredits = async (packId: string) => {
     setBuyingPack(packId);
     try {
       const token = await getAuth_().currentUser?.getIdToken();
-      // Test mode: add credits without real payment
-      const res = await fetch("/api/payments/test-charge", {
+      const res = await fetch("/api/payments/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ credits: creditPacks[packId] || 100 }),
+        body: JSON.stringify({ packId }),
       });
-      if (!res.ok) throw new Error("Charge failed");
-      const data = await res.json();
-      toast("success", `${data.creditsAdded} 크레딧이 충전되었습니다! (테스트)`);
-      await refreshProfile();
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Payment failed");
+      }
+      const { url } = await res.json();
+      if (url) { window.location.href = url; return; }
+      throw new Error("No checkout URL returned");
     } catch {
       toast("error", "충전에 실패했습니다");
     } finally {
@@ -159,37 +191,66 @@ export default function SettingsPage() {
             </div>
           </CardHeader>
           <CardContent>
+            {/* Step 1: Select pack */}
             <div className="grid gap-3 sm:grid-cols-3">
               {[
-                { id: "starter", credits: 100, price: "$10", perCredit: "$0.10" },
-                { id: "growth", credits: 500, price: "$40", perCredit: "$0.08", popular: true },
-                { id: "pro", credits: 1000, price: "$70", perCredit: "$0.07" },
+                { id: "starter", credits: 100, price: 10, perCredit: "$0.10" },
+                { id: "growth", credits: 500, price: 40, perCredit: "$0.08", popular: true },
+                { id: "pro", credits: 1000, price: 70, perCredit: "$0.07" },
               ].map((pack) => (
                 <button
                   key={pack.id}
-                  onClick={() => handleBuyCredits(pack.id)}
-                  disabled={buyingPack !== null}
-                  className={`relative rounded-xl border-2 p-4 text-center transition-all hover:shadow-md ${
-                    pack.popular ? "border-indigo-500 bg-indigo-50" : "border-gray-200 hover:border-indigo-300"
+                  onClick={() => setSelectedPack(pack.id)}
+                  className={`relative rounded-xl border-2 p-4 text-center transition-all ${
+                    selectedPack === pack.id
+                      ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200"
+                      : pack.popular ? "border-indigo-200" : "border-gray-200 hover:border-indigo-300"
                   }`}
                 >
                   {pack.popular && (
-                    <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white">
-                      인기
-                    </div>
+                    <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white">인기</div>
                   )}
                   <p className="text-2xl font-bold text-gray-900">{pack.credits}</p>
                   <p className="text-xs text-gray-500">크레딧</p>
-                  <p className="mt-2 text-lg font-bold text-indigo-600">{pack.price}</p>
+                  <p className="mt-2 text-lg font-bold text-indigo-600">${pack.price}</p>
                   <p className="text-[10px] text-gray-400">크레딧당 {pack.perCredit}</p>
-                  <div className="mt-3">
-                    <Badge variant={buyingPack === pack.id ? "info" : "default"}>
-                      {buyingPack === pack.id ? "처리중..." : "구매하기"}
-                    </Badge>
-                  </div>
                 </button>
               ))}
             </div>
+
+            {/* Step 2: Payment buttons */}
+            <div className="mt-5 space-y-3">
+              {/* Stripe / Card */}
+              <button
+                onClick={() => handleBuyCredits(selectedPack)}
+                disabled={buyingPack !== null}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-gray-200 bg-white px-4 py-4 text-base font-semibold text-gray-900 transition-all hover:border-indigo-300 hover:shadow-md disabled:opacity-50"
+              >
+                💳 {buyingPack ? "처리중..." : `카드로 ${{ starter: 10, growth: 40, pro: 70 }[selectedPack]}  결제하기`}
+              </button>
+
+              {/* Crypto / Banksi PayButton */}
+              <CryptoPayButton
+                amount={{ starter: 10, growth: 40, pro: 70 }[selectedPack] || 40}
+                credits={{ starter: 100, growth: 500, pro: 1000 }[selectedPack] || 500}
+                onSuccess={async (credits: number) => {
+                  // Add credits via API
+                  const token = await getAuth_().currentUser?.getIdToken();
+                  await fetch("/api/payments/test-charge", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ credits }),
+                  });
+                  toast("success", `${credits} 크레딧이 충전되었습니다!`);
+                  await refreshProfile();
+                }}
+              />
+            </div>
+
+            <p className="mt-3 text-[10px] text-gray-400 text-center">
+              크립토: Ethereum · Arbitrum · Base · BSC (USDT/USDC)
+            </p>
+
             <div className="mt-4 rounded-lg bg-gray-50 p-3">
               <p className="text-xs font-medium text-gray-500">크레딧 소모량</p>
               <div className="mt-2 grid grid-cols-2 gap-1 text-xs text-gray-600">

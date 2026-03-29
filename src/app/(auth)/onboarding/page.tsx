@@ -25,6 +25,17 @@ export default function OnboardingPage() {
       await createUserProfile(user, selected);
       await refreshProfile();
 
+      // Google Ads conversion tracking
+      try {
+        if (typeof window !== "undefined" && (window as unknown as Record<string, unknown>).gtag) {
+          (window as unknown as { gtag: (...args: unknown[]) => void }).gtag("event", "conversion", {
+            send_to: "AW-18048528369/xGMxCJ61zJEcEPHfmp5D",
+            value: 1.0,
+            currency: "KRW",
+          });
+        }
+      } catch { /* silent */ }
+
       // Trigger affiliate conversion if referred
       try {
         const refCookie = document.cookie.split("; ").find((c) => c.startsWith("piped_ref="));

@@ -3,7 +3,11 @@ import { adminAuth } from "@/lib/firebase/admin";
 import Stripe from "stripe";
 
 function getStripe() {
-  return new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_placeholder");
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key || key === "sk_test_placeholder") {
+    throw new Error("STRIPE_NOT_CONFIGURED");
+  }
+  return new Stripe(key);
 }
 
 const CREDIT_PACKS = [
