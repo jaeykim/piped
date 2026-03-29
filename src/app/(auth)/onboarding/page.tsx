@@ -24,6 +24,20 @@ export default function OnboardingPage() {
     try {
       await createUserProfile(user, selected);
       await refreshProfile();
+
+      // Trigger affiliate conversion if referred
+      try {
+        const refCookie = document.cookie.split("; ").find((c) => c.startsWith("piped_ref="));
+        if (refCookie) {
+          const refCode = refCookie.split("=")[1];
+          await fetch("/api/affiliates/convert", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ refCode, conversionValue: 0, eventType: "signup" }),
+          });
+        }
+      } catch { /* silent — don't block onboarding */ }
+
       router.push("/dashboard");
     } catch (err) {
       console.error("Onboarding error:", err);

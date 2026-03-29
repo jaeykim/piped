@@ -185,6 +185,59 @@ export default function ProgramDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Promotion Guide */}
+      {affiliateCode && (
+        <Card className="mt-6">
+          <CardHeader>
+            <h2 className="font-semibold text-gray-900">홍보 가이드</h2>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-lg bg-indigo-50 p-4">
+              <h3 className="font-medium text-indigo-900">추천 홍보 문구</h3>
+              <div className="mt-2 space-y-2">
+                {[
+                  `${program.name} 사용해봤는데 진짜 좋아요! 이 링크로 가입하면 특별 혜택을 받을 수 있어요 👉`,
+                  `마케팅 자동화가 필요하다면 ${program.name} 강추! URL만 넣으면 광고가 뚝딱 👇`,
+                  `요즘 사이드 프로젝트 마케팅은 AI한테 맡기는 시대. ${program.name}으로 3분 만에 광고 세팅 완료 🚀`,
+                ].map((text, i) => (
+                  <div key={i} className="flex items-start gap-2 rounded bg-white p-3 text-sm">
+                    <span className="shrink-0 text-indigo-500">{i + 1}.</span>
+                    <p className="flex-1 text-gray-700">{text}</p>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(`${text}\n${trackingUrl}`); toast("success", "복사됨!"); }}
+                      className="shrink-0 text-xs text-indigo-600 hover:text-indigo-800"
+                    >
+                      복사
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-gray-50 p-4">
+              <h3 className="font-medium text-gray-900">홍보 팁</h3>
+              <ul className="mt-2 space-y-1 text-sm text-gray-600">
+                <li>• 인스타그램 스토리에 링크를 넣어보세요 (가장 높은 전환율)</li>
+                <li>• 블로그 리뷰 글에 레퍼럴 링크를 포함하세요</li>
+                <li>• 유튜브 영상 설명란에 링크를 추가하세요</li>
+                <li>• 트위터/쓰레드에 사용 후기와 함께 공유하세요</li>
+                <li>• 커뮤니티(디스코드, 슬랙)에서 자연스럽게 추천하세요</li>
+              </ul>
+            </div>
+
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <h3 className="font-medium text-amber-900">커미션 안내</h3>
+              <p className="mt-1 text-sm text-amber-800">
+                • 추천 링크를 통해 가입한 유저가 결제하면 {program.commissionValue}{program.commissionType === "percentage" ? "%" : "$"}의 커미션을 받습니다
+                <br />• 쿠키 유효기간: {program.cookieDurationDays}일 (클릭 후 {program.cookieDurationDays}일 이내 전환 시 인정)
+                <br />• 최소 출금 금액: $10
+                <br />• 정산 요청은 수익 페이지에서 가능합니다
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
