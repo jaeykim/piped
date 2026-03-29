@@ -15,7 +15,7 @@ import { Users, Plus, Link as LinkIcon, TrendingUp, Eye, DollarSign, Check, X as
 import type { AffiliateProgram } from "@/types/affiliate";
 import type { SiteAnalysis } from "@/types/analysis";
 
-function ProgramDashboard({ program, toast }: { program: AffiliateProgram; toast: (type: string, msg: string) => void }) {
+function ProgramDashboard({ program, toast }: { program: AffiliateProgram; toast: (type: "success" | "error" | "info", msg: string) => void }) {
   const [payouts, setPayouts] = useState<{ id: string; amount: number; status: string; influencerName: string; paymentDetails?: string; createdAt?: { _seconds: number } }[]>([]);
   const [loadingPayouts, setLoadingPayouts] = useState(true);
 
