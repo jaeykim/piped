@@ -104,8 +104,9 @@ export default function SettingsPage() {
   const metaConnected = !!profile?.integrations?.meta?.accessToken;
   const googleConnected = !!profile?.integrations?.google?.refreshToken;
   const [buyingPack, setBuyingPack] = useState<string | null>(null);
-  const [cryptoNetwork, setCryptoNetwork] = useState((profile as Record<string, unknown>)?.payoutSettings?.cryptoNetwork as string || "ethereum");
-  const [cryptoAddress, setCryptoAddress] = useState((profile as Record<string, unknown>)?.payoutSettings?.cryptoAddress as string || "");
+  const payout = (profile as unknown as Record<string, Record<string, string>>)?.payoutSettings;
+  const [cryptoNetwork, setCryptoNetwork] = useState(payout?.cryptoNetwork || "ethereum");
+  const [cryptoAddress, setCryptoAddress] = useState(payout?.cryptoAddress || "");
 
   const creditPacks: Record<string, number> = { starter: 100, growth: 500, pro: 1000 };
 
