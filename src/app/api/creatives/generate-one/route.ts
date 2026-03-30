@@ -298,12 +298,14 @@ export async function POST(request: NextRequest) {
     // Derive all formats from the single base image
     const formats = await deriveFormats(result.imageData, result.mimeType, size);
 
-    // Save primary to Firestore (include base64 for affiliate material display)
+    // Save primary to Firestore
+    // Note: base64 images can exceed Firestore 1MB limit, so truncate if too large
     const imageDataUri = `data:${result.mimeType};base64,${result.imageData}`;
+    const imageUrlToStore = imageDataUri.length < 900_000 ? imageDataUri : ""; // Firestore 1MB limit
     const ref = await adminDb
       .collection(`projects/${projectId}/creatives`)
       .add({
-        imageUrl: imageDataUri,
+        imageUrl: imageUrlToStore,
         prompt: result.prompt,
         size,
         platform,

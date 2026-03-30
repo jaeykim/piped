@@ -457,6 +457,8 @@ export default function CreativesPage() {
     setStep("output-type");
     setSelectedConcept(null);
     setSelectedSubject("graphic-card");
+    setBatchResults([]);
+    setCreative(null);
     setSelectedCopy("");
     setUploadedImage(null);
     setCreative(null);
@@ -519,7 +521,7 @@ export default function CreativesPage() {
             return (
               <button
                 key={opt.id}
-                onClick={() => setOutputType(opt.id)}
+                onClick={() => { setOutputType(opt.id); setBatchResults([]); setCreative(null); }}
                 className={`group relative rounded-2xl border-2 p-6 text-left transition-all ${
                   isSelected ? opt.selectedColor : "border-gray-200 hover:border-gray-300"
                 }`}
@@ -820,7 +822,7 @@ export default function CreativesPage() {
       <div className="mx-auto max-w-4xl">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setStep("output-type")}
+            onClick={() => { setStep("output-type"); setBatchResults([]); setCreative(null); }}
             className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
           >
             <ArrowLeft className="h-5 w-5" />
