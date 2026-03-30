@@ -85,6 +85,49 @@ Include 3-5 competitors and 3 recommended ad angles. Be specific and actionable.
 
     const result = JSON.parse(jsonMatch[0]);
 
+    // Fetch OG images from competitor URLs
+    const competitorsWithImages = await Promise.all(
+      (result.competitors || []).map(async (comp: { name: string; url: string; positioning: string; adStrategy: string; strengths: string[]; weaknesses: string[] }) => {
+        if (!comp.url) return comp;
+        try {
+          const pageRes = await fetch(comp.url, {
+            headers: { "User-Agent": "Mozilla/5.0 (compatible; PipedBot/1.0)" },
+            signal: AbortSignal.timeout(5000),
+          });
+          if (!pageRes.ok) return comp;
+          const html = await pageRes.text();
+          // Extract OG image
+          const ogMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i)
+            || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+          const faviconMatch = html.match(/<link[^>]*rel=["'](?:icon|shortcut icon|apple-touch-icon)["'][^>]*href=["']([^"']+)["']/i);
+          const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
+          return {
+            ...comp,
+            ogImage: ogMatch?.[1] || null,
+            favicon: faviconMatch?.[1] ? new URL(faviconMatch[1], comp.url).href : null,
+            title: titleMatch?.[1]?.trim() || comp.name,
+          };
+        } catch {
+          return comp;
+        }
+      })
+    );
+
+    result.competitors = competitorsWithImages;
+
+    // Generate sample ad templates based on recommended angles + our product
+    const sampleTemplates = (result.recommendedAngles || []).map((angle: { angle: string; description: string; example: string }, i: number) => ({
+      id: `template-${i}`,
+      angle: angle.angle,
+      headline: angle.example,
+      description: angle.description,
+      concept: i === 0 ? "benefit-driven" : i === 1 ? "comparison" : "pain-point",
+      productImage: analysis.screenshots?.[0] || analysis.logoUrl || null,
+      productName: analysis.productName,
+      brandColor: analysis.brandColors?.[0] || "#4F46E5",
+    }));
+    result.sampleTemplates = sampleTemplates;
+
     // Cache result in Firestore
     await adminDb.doc(`projects/${projectId}/analysis/competitors`).set({
       ...result,

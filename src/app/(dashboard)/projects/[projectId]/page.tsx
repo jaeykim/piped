@@ -38,7 +38,14 @@ export default function ProjectDetailPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [analysis, setAnalysis] = useState<SiteAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
-  const [competitors, setCompetitors] = useState<{ competitors: { name: string; positioning: string; adStrategy: string; strengths: string[]; weaknesses: string[] }[]; ourAdvantages: string[]; recommendedAngles: { angle: string; description: string; example: string }[]; marketInsight: string } | null>(null);
+  const [competitors, setCompetitors] = useState<{
+    competitors: { name: string; url?: string; positioning: string; adStrategy: string; strengths: string[]; weaknesses: string[]; ogImage?: string; favicon?: string }[];
+    ourAdvantages: string[];
+    recommendedAngles: { angle: string; description: string; example: string }[];
+    sampleTemplates?: { id: string; angle: string; headline: string; description: string; concept: string; productImage?: string; productName: string; brandColor: string }[];
+    marketInsight: string;
+  } | null>(null);
+  const [editingTemplate, setEditingTemplate] = useState<{ id: string; headline: string; description: string } | null>(null);
   const [loadingCompetitors, setLoadingCompetitors] = useState(false);
   const { toast } = useToast();
 
@@ -261,10 +268,18 @@ export default function ProjectDetailPage() {
               <div className="space-y-2">
                 {competitors.competitors.map((comp, i) => (
                   <div key={i} className="rounded-lg border border-gray-200 p-3">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium text-gray-900">{comp.name}</p>
+                    <div className="flex items-center gap-3">
+                      {comp.ogImage && (
+                        <img src={comp.ogImage} alt={comp.name} className="h-12 w-20 shrink-0 rounded border border-gray-200 object-cover" />
+                      )}
+                      {!comp.ogImage && comp.favicon && (
+                        <img src={comp.favicon} alt={comp.name} className="h-8 w-8 shrink-0 rounded" />
+                      )}
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900">{comp.name}</p>
+                        <p className="text-xs text-gray-600">{comp.positioning}</p>
+                      </div>
                     </div>
-                    <p className="mt-1 text-xs text-gray-600">{comp.positioning}</p>
                     <p className="mt-1 text-xs text-gray-500">{isKo ? "광고 전략" : "Ad strategy"}: {comp.adStrategy}</p>
                     <div className="mt-2 flex gap-4 text-[10px]">
                       <div>
@@ -303,6 +318,92 @@ export default function ProjectDetailPage() {
                   ))}
                 </div>
               </div>
+
+              {/* Sample Ad Templates — editable */}
+              {competitors.sampleTemplates && competitors.sampleTemplates.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-700 mb-2">{isKo ? "광고 예시 — 클릭하여 편집" : "Ad Samples — Click to edit"}</p>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {competitors.sampleTemplates.map((tmpl) => {
+                    const isEditing = editingTemplate?.id === tmpl.id;
+                    return (
+                      <div key={tmpl.id} className="rounded-xl border-2 border-gray-200 overflow-hidden hover:border-indigo-300 transition-all">
+                        {/* Preview card */}
+                        <div className="aspect-square relative" style={{ backgroundColor: tmpl.brandColor + "15" }}>
+                          {tmpl.productImage && (
+                            <img src={tmpl.productImage} alt="" className="absolute inset-0 w-full h-full object-cover opacity-20" />
+                          )}
+                          <div className="absolute inset-0 flex flex-col justify-between p-4">
+                            <div>
+                              <Badge variant="info" className="text-[9px] mb-2">{tmpl.angle}</Badge>
+                              {isEditing ? (
+                                <input
+                                  value={editingTemplate.headline}
+                                  onChange={(e) => setEditingTemplate({ ...editingTemplate, headline: e.target.value })}
+                                  className="w-full bg-white/90 rounded px-2 py-1 text-sm font-bold text-gray-900 border border-indigo-300 focus:outline-none"
+                                  autoFocus
+                                />
+                              ) : (
+                                <p className="text-sm font-bold text-gray-900 leading-tight">&quot;{tmpl.headline}&quot;</p>
+                              )}
+                            </div>
+                            <div>
+                              {isEditing ? (
+                                <textarea
+                                  value={editingTemplate.description}
+                                  onChange={(e) => setEditingTemplate({ ...editingTemplate, description: e.target.value })}
+                                  className="w-full bg-white/90 rounded px-2 py-1 text-[10px] text-gray-700 border border-indigo-300 focus:outline-none resize-none"
+                                  rows={2}
+                                />
+                              ) : (
+                                <p className="text-[10px] text-gray-600">{tmpl.description}</p>
+                              )}
+                              <p className="mt-1 text-[9px] font-semibold" style={{ color: tmpl.brandColor }}>{tmpl.productName}</p>
+                            </div>
+                          </div>
+                        </div>
+                        {/* Action */}
+                        <div className="p-2 flex gap-1">
+                          {isEditing ? (
+                            <>
+                              <Button size="sm" className="flex-1 text-[10px]" onClick={() => {
+                                // Save edited template back
+                                if (competitors?.sampleTemplates) {
+                                  setCompetitors({
+                                    ...competitors,
+                                    sampleTemplates: competitors.sampleTemplates.map((t) =>
+                                      t.id === tmpl.id ? { ...t, headline: editingTemplate.headline, description: editingTemplate.description } : t
+                                    ),
+                                  });
+                                }
+                                setEditingTemplate(null);
+                                toast("success", isKo ? "수정됨" : "Updated");
+                              }}>
+                                {isKo ? "저장" : "Save"}
+                              </Button>
+                              <Button size="sm" variant="outline" className="text-[10px]" onClick={() => setEditingTemplate(null)}>
+                                {isKo ? "취소" : "Cancel"}
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button size="sm" variant="outline" className="flex-1 text-[10px]" onClick={() => setEditingTemplate({ id: tmpl.id, headline: tmpl.headline, description: tmpl.description })}>
+                                {isKo ? "문구 편집" : "Edit Copy"}
+                              </Button>
+                              <Link href={`/projects/${projectId}/creatives`}>
+                                <Button size="sm" className="text-[10px]">
+                                  {isKo ? "이 전략으로 생성" : "Create Ad"}
+                                </Button>
+                              </Link>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              )}
             </CardContent>
           )}
         </Card>
