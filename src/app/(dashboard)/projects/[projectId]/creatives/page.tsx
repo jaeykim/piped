@@ -1048,12 +1048,26 @@ export default function CreativesPage() {
               const subjectLabel = CREATIVE_SUBJECTS.find((s) => s.id === r.subject)?.name || r.subject;
               return (
                 <Card key={r.id} className="overflow-hidden">
-                  <div className="aspect-square relative bg-gray-50">
+                  <div className="aspect-square relative bg-gray-50 cursor-pointer group"
+                    onClick={() => setEditingCreative({
+                      baseImage: r.baseImage,
+                      hookText: r.hookText,
+                      productName: creative?.productName || "",
+                      brandColor: creative?.brandColor || "#4F46E5",
+                      size: "1080x1080",
+                      isComplete: r.isComplete,
+                    })}
+                  >
                     {r.baseImage && (
                       <img src={r.baseImage} alt={r.hookText} className="w-full h-full object-cover" />
                     )}
                     <div className="absolute top-2 left-2">
                       <Badge variant="info" className="text-[10px]">#{i + 1}</Badge>
+                    </div>
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                      <span className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-gray-900 shadow-lg">
+                        {isKo ? "편집" : "Edit"}
+                      </span>
                     </div>
                   </div>
                   <CardContent className="p-3">
@@ -1254,7 +1268,7 @@ export default function CreativesPage() {
           data={editingCreative}
           onClose={() => setEditingCreative(null)}
           onSave={(dataUrl) => {
-            // Apply edited image back to the creative
+            // Apply edited image back to the creative or batch result
             if (creative) {
               const editedSize = editingCreative.size;
               setCreative({
@@ -1262,9 +1276,17 @@ export default function CreativesPage() {
                 formats: creative.formats.map((f) =>
                   f.size === editedSize ? { ...f, baseImage: dataUrl } : f
                 ),
-                // If editing the base image size, update baseImage too
                 baseImage: editedSize === creative.size ? dataUrl : creative.baseImage,
               });
+            }
+            // Also check batch results
+            if (batchResults.length > 0) {
+              const match = batchResults.find((r) => r.baseImage === editingCreative.baseImage);
+              if (match) {
+                setBatchResults((prev) => prev.map((r) =>
+                  r.id === match.id ? { ...r, baseImage: dataUrl } : r
+                ));
+              }
             }
             setEditingCreative(null);
             toast("success", isKo ? "편집이 적용되었습니다" : "Edit applied");
