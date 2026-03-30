@@ -23,7 +23,19 @@ interface TextLayer {
   x: number; // percentage 0-100
   y: number; // percentage 0-100
   fontSize: number; // percentage of default
+  color: string;
+  fontFamily: string;
+  shadow: boolean;
 }
+
+const FONT_OPTIONS = [
+  { label: "기본 (Sans)", value: "Helvetica Neue, Helvetica, Arial, sans-serif" },
+  { label: "둥근 (Rounded)", value: "system-ui, -apple-system, sans-serif" },
+  { label: "모노 (Mono)", value: "SF Mono, Menlo, monospace" },
+  { label: "세리프 (Serif)", value: "Georgia, Times New Roman, serif" },
+];
+
+const COLOR_PRESETS = ["#FFFFFF", "#000000", "#FF3B30", "#FF9500", "#FFCC00", "#34C759", "#007AFF", "#5856D6", "#AF52DE", "#FF2D55"];
 
 interface Props {
   data: CreativeEditorData;
@@ -85,11 +97,12 @@ export function CreativeEditor({ data, onClose, onSave }: Props) {
 
   // Text layers — hidden by default for graphic cards (text already baked in)
   const showText = !data.isComplete;
+  const defaultFont = FONT_OPTIONS[0].value;
   const [layers, setLayers] = useState<TextLayer[]>([
-    { id: "headline", label: "헤드라인", text: data.hookText, visible: showText, x: 7, y: 5, fontSize: 100 },
-    { id: "sub", label: "서브 텍스트", text: data.subheadline || "", visible: showText && !!(data.subheadline), x: 7, y: 40, fontSize: 100 },
-    { id: "cta", label: "CTA 버튼", text: data.cta || "", visible: showText && !!(data.cta), x: 30, y: 85, fontSize: 100 },
-    { id: "brand", label: "브랜드", text: data.productName, visible: showText, x: 7, y: 92, fontSize: 100 },
+    { id: "headline", label: "헤드라인", text: data.hookText, visible: showText, x: 7, y: 5, fontSize: 100, color: "#FFFFFF", fontFamily: defaultFont, shadow: true },
+    { id: "sub", label: "서브 텍스트", text: data.subheadline || "", visible: showText && !!(data.subheadline), x: 7, y: 40, fontSize: 100, color: "rgba(255,255,255,0.85)", fontFamily: defaultFont, shadow: true },
+    { id: "cta", label: "CTA 버튼", text: data.cta || "", visible: showText && !!(data.cta), x: 30, y: 85, fontSize: 100, color: "#FFFFFF", fontFamily: defaultFont, shadow: true },
+    { id: "brand", label: "브랜드", text: data.productName, visible: showText, x: 7, y: 92, fontSize: 100, color: "rgba(255,255,255,0.7)", fontFamily: defaultFont, shadow: false },
   ]);
 
   useEffect(() => {
@@ -147,71 +160,75 @@ export function CreativeEditor({ data, onClose, onSave }: Props) {
 
       const lx = (layer.x / 100) * w;
       const ly = (layer.y / 100) * h;
+      const font = layer.fontFamily;
+
+      const applyShadow = (blur: number, offsetY: number, opacity: number) => {
+        if (layer.shadow) {
+          ctx.shadowColor = `rgba(0,0,0,${opacity})`;
+          ctx.shadowBlur = blur;
+          ctx.shadowOffsetY = offsetY;
+        }
+      };
+      const clearShadow = () => { ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0; };
 
       if (layer.id === "headline") {
         const fs = Math.round(w * 0.065 * (layer.fontSize / 100));
-        ctx.font = `900 ${fs}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+        ctx.font = `900 ${fs}px ${font}`;
         ctx.textAlign = "left";
         ctx.textBaseline = "top";
         const maxW = w - lx - w * 0.07;
 
-        // Auto-fit
         let actualFs = fs;
         let lines: string[] = [];
         for (let i = 0; i < 6; i++) {
-          ctx.font = `900 ${actualFs}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+          ctx.font = `900 ${actualFs}px ${font}`;
           lines = smartWrap(ctx, layer.text, maxW);
           if (lines.length <= 4) break;
           actualFs = Math.round(actualFs * 0.88);
         }
-        ctx.font = `900 ${actualFs}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+        ctx.font = `900 ${actualFs}px ${font}`;
 
         lines.forEach((line, i) => {
-          ctx.shadowColor = "rgba(0,0,0,0.7)";
-          ctx.shadowBlur = 12;
-          ctx.shadowOffsetY = 2;
-          ctx.fillStyle = "#FFFFFF";
+          applyShadow(12, 2, 0.7);
+          ctx.fillStyle = layer.color;
           ctx.fillText(line, lx, ly + i * (actualFs * 1.15));
         });
-        ctx.shadowColor = "transparent";
+        clearShadow();
 
       } else if (layer.id === "sub") {
         const fs = Math.round(w * 0.032 * (layer.fontSize / 100));
-        ctx.font = `500 ${fs}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+        ctx.font = `500 ${fs}px ${font}`;
         ctx.textAlign = "left";
         ctx.textBaseline = "top";
         const lines = smartWrap(ctx, layer.text, w - lx - w * 0.07);
         lines.slice(0, 3).forEach((line, i) => {
-          ctx.shadowColor = "rgba(0,0,0,0.4)";
-          ctx.shadowBlur = 6;
-          ctx.fillStyle = "rgba(255,255,255,0.85)";
+          applyShadow(6, 1, 0.4);
+          ctx.fillStyle = layer.color;
           ctx.fillText(line, lx, ly + i * (fs * 1.3));
         });
-        ctx.shadowColor = "transparent";
+        clearShadow();
 
       } else if (layer.id === "cta") {
         const fs = Math.round(w * 0.028 * (layer.fontSize / 100));
-        ctx.font = `700 ${fs}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+        ctx.font = `700 ${fs}px ${font}`;
         const tw = ctx.measureText(layer.text).width + fs * 3;
         const th = fs * 2.6;
 
         ctx.fillStyle = data.brandColor;
-        ctx.shadowColor = "rgba(0,0,0,0.25)";
-        ctx.shadowBlur = 8;
-        ctx.shadowOffsetY = 3;
+        applyShadow(8, 3, 0.25);
         ctx.beginPath();
         ctx.roundRect(lx, ly, tw, th, th / 2);
         ctx.fill();
-        ctx.shadowColor = "transparent";
+        clearShadow();
 
-        ctx.fillStyle = "#FFFFFF";
+        ctx.fillStyle = layer.color;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(layer.text, lx + tw / 2, ly + th / 2);
 
       } else if (layer.id === "brand") {
         const fs = Math.round(w * 0.02 * (layer.fontSize / 100));
-        ctx.font = `600 ${fs}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+        ctx.font = `600 ${fs}px ${font}`;
         const bw = ctx.measureText(layer.text).width + 16;
         const bh = fs * 2;
 
@@ -219,7 +236,7 @@ export function CreativeEditor({ data, onClose, onSave }: Props) {
         ctx.beginPath();
         ctx.roundRect(lx, ly, bw, bh, bh / 2);
         ctx.fill();
-        ctx.fillStyle = "rgba(255,255,255,0.7)";
+        ctx.fillStyle = layer.color;
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
         ctx.fillText(layer.text, lx + 8, ly + bh / 2);
@@ -301,10 +318,10 @@ export function CreativeEditor({ data, onClose, onSave }: Props) {
 
   const handleReset = () => {
     setLayers([
-      { id: "headline", label: "헤드라인", text: data.hookText, visible: showText, x: 7, y: 5, fontSize: 100 },
-      { id: "sub", label: "서브 텍스트", text: data.subheadline || "", visible: showText && !!(data.subheadline), x: 7, y: 40, fontSize: 100 },
-      { id: "cta", label: "CTA 버튼", text: data.cta || "", visible: showText && !!(data.cta), x: 30, y: 85, fontSize: 100 },
-      { id: "brand", label: "브랜드", text: data.productName, visible: showText, x: 7, y: 92, fontSize: 100 },
+      { id: "headline", label: "헤드라인", text: data.hookText, visible: showText, x: 7, y: 5, fontSize: 100, color: "#FFFFFF", fontFamily: defaultFont, shadow: true },
+      { id: "sub", label: "서브 텍스트", text: data.subheadline || "", visible: showText && !!(data.subheadline), x: 7, y: 40, fontSize: 100, color: "rgba(255,255,255,0.85)", fontFamily: defaultFont, shadow: true },
+      { id: "cta", label: "CTA 버튼", text: data.cta || "", visible: showText && !!(data.cta), x: 30, y: 85, fontSize: 100, color: "#FFFFFF", fontFamily: defaultFont, shadow: true },
+      { id: "brand", label: "브랜드", text: data.productName, visible: showText, x: 7, y: 92, fontSize: 100, color: "rgba(255,255,255,0.7)", fontFamily: defaultFont, shadow: false },
     ]);
     setBrightness(100); setContrast(100); setSaturation(100); setOverlayOpacity(40);
   };
@@ -354,6 +371,7 @@ export function CreativeEditor({ data, onClose, onSave }: Props) {
                       className="w-full rounded border border-gray-200 px-2 py-1.5 text-xs focus:border-indigo-400 focus:outline-none"
                     />
                   )}
+                  {/* Font size */}
                   <div className="flex items-center gap-2">
                     <Type className="h-3 w-3 text-gray-400" />
                     <input
@@ -363,6 +381,43 @@ export function CreativeEditor({ data, onClose, onSave }: Props) {
                     />
                     <span className="text-[10px] text-gray-400 w-8">{layer.fontSize}%</span>
                   </div>
+                  {/* Color presets */}
+                  <div className="flex items-center gap-1">
+                    {COLOR_PRESETS.map((c) => (
+                      <button
+                        key={c}
+                        onClick={() => updateLayer(layer.id, { color: c })}
+                        className={`h-5 w-5 rounded-full border-2 transition-all ${layer.color === c ? "border-indigo-500 scale-110" : "border-gray-200"}`}
+                        style={{ backgroundColor: c }}
+                      />
+                    ))}
+                    <input
+                      type="color"
+                      value={layer.color.startsWith("#") ? layer.color : "#ffffff"}
+                      onChange={(e) => updateLayer(layer.id, { color: e.target.value })}
+                      className="h-5 w-5 cursor-pointer rounded border-0 p-0"
+                    />
+                  </div>
+                  {/* Font family */}
+                  <select
+                    value={layer.fontFamily}
+                    onChange={(e) => updateLayer(layer.id, { fontFamily: e.target.value })}
+                    className="w-full rounded border border-gray-200 px-2 py-1 text-[10px] text-gray-700 focus:border-indigo-400 focus:outline-none"
+                  >
+                    {FONT_OPTIONS.map((f) => (
+                      <option key={f.value} value={f.value}>{f.label}</option>
+                    ))}
+                  </select>
+                  {/* Shadow toggle */}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={layer.shadow}
+                      onChange={(e) => updateLayer(layer.id, { shadow: e.target.checked })}
+                      className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span className="text-[10px] text-gray-500">그림자</span>
+                  </label>
                 </div>
               )}
             </div>
