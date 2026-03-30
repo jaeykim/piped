@@ -21,10 +21,11 @@ export interface CardConfig {
   subheadline?: string;
   cta?: string;
   badge?: string;             // e.g. "출시특가", "기간 한정", "무료 체험"
+  topBanner?: string;         // ZET-style top banner text (red/yellow strip)
   productName: string;
   brandColor: string;
   size: string;
-  style: "light" | "dark" | "gradient";
+  style: "light" | "dark" | "gradient" | "bold" | "review";
   tags?: string[];
 }
 
@@ -107,6 +108,17 @@ function buildBgSvg(w: number, h: number, r: number, g: number, b: number, style
     bg = `<rect width="${w}" height="${h}" fill="${lighten(r, g, b, 0.82)}"/>
       <rect width="${w}" height="${h}" fill="url(#bgGrad)" opacity="0.18"/>
       <circle cx="${w * 0.88}" cy="${h * 0.75}" r="${w * 0.22}" fill="rgb(${r},${g},${b})" opacity="0.1"/>`;
+  } else if (style === "bold") {
+    // ZET-style bold: strong brand color background
+    bg = `<rect width="${w}" height="${h}" fill="rgb(${r},${g},${b})"/>
+      <rect width="${w}" height="${h}" fill="url(#bgGrad)" opacity="0.3"/>
+      <circle cx="${w * 0.85}" cy="${h * 0.8}" r="${w * 0.25}" fill="rgba(255,255,255,0.08)"/>
+      <circle cx="${w * 0.1}" cy="${h * 0.15}" r="${w * 0.15}" fill="rgba(255,255,255,0.05)"/>`;
+  } else if (style === "review") {
+    // ZET-style review/testimonial: warm cream background
+    bg = `<rect width="${w}" height="${h}" fill="#FFF9F0"/>
+      <rect width="${w}" height="${h}" fill="url(#bgGrad)" opacity="0.05"/>
+      <circle cx="${w * 0.9}" cy="${h * 0.85}" r="${w * 0.18}" fill="rgb(${r},${g},${b})" opacity="0.06"/>`;
   } else {
     bg = `<rect width="${w}" height="${h}" fill="#F5F5F5"/>
       <rect width="${w}" height="${h}" fill="url(#bgGrad)" opacity="0.1"/>
@@ -136,7 +148,7 @@ function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: nu
   const isLandscape = w > h;
   const ref = Math.min(w, h);
   const pad = Math.round(ref * 0.07);
-  const isDark = config.style === "dark";
+  const isDark = config.style === "dark" || config.style === "bold";
 
   const baseHeadSize = Math.round(ref * (isLandscape ? 0.12 : 0.075));
   const subSize = Math.round(ref * (isLandscape ? 0.055 : 0.034));
@@ -150,9 +162,20 @@ function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: nu
   const tagText = isDark ? "rgba(255,255,255,0.9)" : `rgb(${r},${g},${b})`;
   const maxTextW = w - pad * 2;
 
+  // Top banner (ZET-style red/yellow strip) — e.g. "이 광고 안 보면 손해 봅니다"
+  let topBannerSvg = "";
+  let y = pad;
+  if (config.topBanner) {
+    const bannerH = Math.round(ref * 0.06);
+    const bannerFontSize = Math.round(ref * 0.028);
+    topBannerSvg = `
+      <rect x="0" y="0" width="${w}" height="${bannerH}" fill="#E53E3E"/>
+      <text x="${w / 2}" y="${bannerH / 2 + bannerFontSize * 0.35}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="900" font-size="${bannerFontSize}" fill="#FFFFFF" text-anchor="middle">${esc(config.topBanner)}</text>`;
+    y = bannerH + ref * 0.02;
+  }
+
   // Badge (top, above headline) — e.g. "출시특가", "기간 한정"
   let badgeSvgTop = "";
-  let y = pad;
   if (config.badge) {
     const bSize = Math.round(ref * 0.024);
     const bPad = bSize * 0.6;
@@ -168,6 +191,17 @@ function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: nu
   const { size: headSize, lines: headLines } = fitHeadline(config.headline, baseHeadSize, maxTextW, 4);
   const lineH = headSize * 1.15;
   const highlights = config.highlightWords || [];
+
+  // ZET pattern: detect big number emphasis (55%, 700%, 833원, 0원, $5,900)
+  const bigNumberMatch = config.headline.match(/(\d[\d,.]*\s*(%|원|만원|달러|개월|배|일|시간|분|명|\$))/);
+  let bigNumberSvg = "";
+  if (bigNumberMatch && headLines.length <= 2) {
+    // Show the number extra large above the headline
+    const numText = bigNumberMatch[1];
+    const numSize = Math.round(ref * (isLandscape ? 0.18 : 0.12));
+    bigNumberSvg = `<text x="${pad}" y="${y + numSize}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="900" font-size="${numSize}" fill="rgb(${r},${g},${b})">${esc(numText)}</text>`;
+    y += numSize + ref * 0.01;
+  }
 
   const headSvg = headLines.map((line, i) => {
     const ly = y + headSize + i * lineH;
@@ -248,7 +282,7 @@ function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: nu
     <text x="${bx + 8}" y="${by + bh / 2 + badgeSize * 0.35}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="600" font-size="${badgeSize}" fill="${isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.35)"}">${esc(config.productName)}</text>`;
 
   return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
-    ${badgeSvgTop}${headSvg}${accent}${subSvg}${tagsSvg}${ctaSvg}${brandSvg}
+    ${topBannerSvg}${badgeSvgTop}${bigNumberSvg}${headSvg}${accent}${subSvg}${tagsSvg}${ctaSvg}${brandSvg}
   </svg>`;
 }
 

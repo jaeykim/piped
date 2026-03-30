@@ -30,6 +30,10 @@ import {
   Edit3,
   Package,
   Video,
+  ArrowLeftRight,
+  Timer,
+  BookOpen,
+  HelpCircle,
 } from "lucide-react";
 import {
   CREATIVE_CONCEPTS,
@@ -97,9 +101,14 @@ const CONCEPT_ICONS: Record<CreativeConcept, typeof Zap> = {
   "social-proof": Star,
   offer: Clock,
   "how-it-works": ArrowRight,
+  "before-after": ArrowLeftRight,
+  comparison: ArrowLeftRight,
+  urgency: Timer,
+  story: BookOpen,
+  question: HelpCircle,
 };
 
-type OutputType = "image" | "video";
+type OutputType = "image" | "video" | "batch";
 type Step = "output-type" | "copy" | "concept" | "generate";
 
 export default function CreativesPage() {
@@ -136,6 +145,7 @@ export default function CreativesPage() {
   const [generatingVideo, setGeneratingVideo] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [hasCampaigns, setHasCampaigns] = useState(false);
+  const [batchResults, setBatchResults] = useState<{ id: string; baseImage: string; hookText: string; concept: string; subject: string; isComplete: boolean }[]>([]);
 
   // Load project settings (language/country from copy step)
   useEffect(() => {
@@ -474,25 +484,34 @@ export default function CreativesPage() {
         <h1 className="text-2xl font-bold text-gray-900">Ad Creatives</h1>
         <p className="mt-1 text-sm text-gray-500">어떤 콘텐츠를 만들까요?</p>
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+        <div className="mt-8 grid gap-4 sm:grid-cols-3">
           {[
             {
               id: "image" as OutputType,
               icon: Image,
-              title: "이미지 광고",
-              desc: "Instagram, Facebook, Google 용 정적 이미지 광고를 만듭니다.",
-              detail: "AI 이미지 생성 + 텍스트 오버레이 + 5개 포맷 자동 변환",
+              title: isKo ? "이미지 광고" : "Image Ad",
+              desc: isKo ? "Instagram, Facebook, Google 용 정적 이미지 광고를 만듭니다." : "Create static image ads for Instagram, Facebook, Google.",
+              detail: isKo ? "AI 이미지 생성 + 텍스트 오버레이 + 5개 포맷 자동 변환" : "AI image + text overlay + 5 format auto-conversion",
               color: "bg-purple-50 text-purple-600 border-purple-200",
               selectedColor: "border-purple-500 bg-purple-50 ring-2 ring-purple-200",
             },
             {
               id: "video" as OutputType,
               icon: Video,
-              title: "영상 광고",
-              desc: "이미지를 기반으로 5초 모션 영상을 만듭니다.",
-              detail: "Google Veo AI로 시네마틱 모션 생성",
+              title: isKo ? "영상 광고" : "Video Ad",
+              desc: isKo ? "이미지를 기반으로 5초 모션 영상을 만듭니다." : "Create 5-second motion videos from images.",
+              detail: isKo ? "Google Veo AI로 시네마틱 모션 생성" : "Cinematic motion with Google Veo AI",
               color: "bg-pink-50 text-pink-600 border-pink-200",
               selectedColor: "border-pink-500 bg-pink-50 ring-2 ring-pink-200",
+            },
+            {
+              id: "batch" as OutputType,
+              icon: Sparkles,
+              title: isKo ? "A/B 테스트" : "A/B Test",
+              desc: isKo ? "AI가 추천하는 3~5개 컨셉을 한번에 생성하고 비교합니다." : "Generate 3-5 AI-recommended concepts at once and compare.",
+              detail: isKo ? "다양한 컨셉 실험 → 고성과 크리에이티브 발굴" : "Test multiple concepts → find top performers",
+              color: "bg-orange-50 text-orange-600 border-orange-200",
+              selectedColor: "border-orange-500 bg-orange-50 ring-2 ring-orange-200",
             },
           ].map((opt) => {
             const Icon = opt.icon;
@@ -522,10 +541,78 @@ export default function CreativesPage() {
         </div>
 
         <div className="mt-8 flex justify-end">
-          <Button onClick={() => setStep("copy")} size="lg">
-            다음: 문구 선택
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
+          {outputType === "batch" ? (
+            <Button
+              onClick={async () => {
+                setStep("generate");
+                setGenerating(true);
+                try {
+                  const token = await getAuth_().currentUser?.getIdToken();
+                  // Get recommendations first
+                  const recRes = await fetch("/api/creatives/recommend", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ projectId, language: LANGUAGES.find((l) => l.code === selectedLanguage)?.label }),
+                  });
+                  let variants = [
+                    { concept: "benefit-driven", subject: "graphic-card" },
+                    { concept: "pain-point", subject: "graphic-card" },
+                    { concept: "social-proof", subject: "product-ui" },
+                  ];
+                  if (recRes.ok) {
+                    const recData = await recRes.json();
+                    if (recData.recommendations?.length > 0) {
+                      variants = recData.recommendations.map((r: { concept: string; subject: string }) => ({
+                        concept: r.concept,
+                        subject: r.subject,
+                      }));
+                    }
+                  }
+
+                  const batchRes = await fetch("/api/creatives/batch-generate", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({
+                      projectId,
+                      variants,
+                      language: LANGUAGES.find((l) => l.code === selectedLanguage)?.label,
+                      country: COUNTRIES.find((c) => c.code === selectedCountry)?.label,
+                    }),
+                  });
+
+                  if (batchRes.ok) {
+                    const data = await batchRes.json();
+                    setBatchResults(data.results.map((r: { id: string; baseImage: string; hookText: string; isComplete: boolean }, i: number) => ({
+                      id: r.id,
+                      baseImage: r.baseImage,
+                      hookText: r.hookText,
+                      concept: variants[i]?.concept || "",
+                      subject: variants[i]?.subject || "",
+                      isComplete: r.isComplete,
+                    })));
+                    toast("success", isKo ? `${data.succeeded}개 크리에이티브 생성 완료!` : `${data.succeeded} creatives generated!`);
+                  } else {
+                    const err = await batchRes.json();
+                    toast("error", err.error);
+                  }
+                } catch (e) {
+                  toast("error", isKo ? "배치 생성 실패" : "Batch generation failed");
+                }
+                setGenerating(false);
+                refreshProfile();
+              }}
+              size="lg"
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              {isKo ? "AI 추천 3개 한번에 생성" : "Generate 3 AI-Recommended"}
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          ) : (
+            <Button onClick={() => setStep("copy")} size="lg">
+              {isKo ? "다음: 문구 선택" : "Next: Select Copy"}
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
     );
@@ -596,9 +683,9 @@ export default function CreativesPage() {
           </div>
         )}
 
-        <h2 className="mt-8 text-sm font-medium text-gray-700">메시지 전략</h2>
-        <div className="mt-2 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {CREATIVE_CONCEPTS.map((concept) => {
+        <h2 className="mt-8 text-sm font-medium text-gray-700">{isKo ? "메시지 전략" : "Message Strategy"}</h2>
+        <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {CREATIVE_CONCEPTS.filter((c) => c.category === "core").map((concept) => {
             const Icon = CONCEPT_ICONS[concept.id];
             const isSelected = selectedConcept === concept.id;
             const isRecommended = recommendations.some((r) => r.concept === concept.id);
@@ -641,6 +728,47 @@ export default function CreativesPage() {
                 {isSelected && (
                   <div className="absolute right-3 top-3">
                     <CheckCircle className="h-5 w-5 text-indigo-500" />
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <h2 className="mt-6 text-sm font-medium text-gray-700">{isKo ? "고급 전략" : "Advanced Strategies"}</h2>
+        <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {CREATIVE_CONCEPTS.filter((c) => c.category === "advanced").map((concept) => {
+            const Icon = CONCEPT_ICONS[concept.id];
+            const isSelected = selectedConcept === concept.id;
+            const isRecommended = recommendations.some((r) => r.concept === concept.id);
+            return (
+              <button
+                key={concept.id}
+                onClick={() => setSelectedConcept(concept.id)}
+                className={`group relative rounded-xl border-2 p-4 text-left transition-all ${
+                  isSelected
+                    ? "border-orange-500 bg-orange-50 ring-2 ring-orange-200"
+                    : "border-gray-200 bg-white hover:border-orange-300 hover:shadow-md"
+                }`}
+              >
+                <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                  isSelected ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-500 group-hover:bg-orange-100 group-hover:text-orange-600"
+                }`}>
+                  <Icon className="h-4 w-4" />
+                </div>
+                <h3 className="mt-2 font-semibold text-gray-900 text-sm">{isKo ? concept.name : concept.nameEn}</h3>
+                <p className="mt-0.5 text-xs text-gray-500">{isKo ? concept.description : concept.descriptionEn}</p>
+                <p className="mt-1 rounded bg-gray-50 px-2 py-1 text-[10px] text-gray-400 italic">
+                  {isKo ? "예" : "e.g."}: &quot;{isKo ? concept.exampleHook : concept.exampleHookEn}&quot;
+                </p>
+                {isRecommended && !isSelected && (
+                  <div className="absolute right-2 top-2">
+                    <Badge variant="info" className="text-[10px]">AI</Badge>
+                  </div>
+                )}
+                {isSelected && (
+                  <div className="absolute right-2 top-2">
+                    <CheckCircle className="h-4 w-4 text-orange-500" />
                   </div>
                 )}
               </button>
@@ -896,6 +1024,45 @@ export default function CreativesPage() {
             </p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Batch A/B Results */}
+      {batchResults.length > 0 && !generating && (
+        <div className="mt-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            {isKo ? "A/B 테스트 결과" : "A/B Test Results"} ({batchResults.length}{isKo ? "개" : ""})
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {batchResults.map((r, i) => {
+              const conceptLabel = CREATIVE_CONCEPTS.find((c) => c.id === r.concept)?.name || r.concept;
+              const subjectLabel = CREATIVE_SUBJECTS.find((s) => s.id === r.subject)?.name || r.subject;
+              return (
+                <Card key={r.id} className="overflow-hidden">
+                  <div className="aspect-square relative bg-gray-50">
+                    {r.baseImage && (
+                      <img src={r.baseImage} alt={r.hookText} className="w-full h-full object-cover" />
+                    )}
+                    <div className="absolute top-2 left-2">
+                      <Badge variant="info" className="text-[10px]">#{i + 1}</Badge>
+                    </div>
+                  </div>
+                  <CardContent className="p-3">
+                    <p className="text-xs font-semibold text-gray-900">{conceptLabel}</p>
+                    <p className="text-[10px] text-gray-500">{subjectLabel}</p>
+                    {r.hookText && <p className="mt-1 text-xs text-indigo-600 italic">&quot;{r.hookText}&quot;</p>}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <p className="text-xs text-amber-700">
+              {isKo
+                ? "💡 이 크리에이티브들로 캠페인을 실행하면 어떤 컨셉이 가장 성과가 좋은지 비교할 수 있습니다."
+                : "💡 Run campaigns with these creatives to compare which concept performs best."}
+            </p>
+          </div>
+        </div>
       )}
 
       {/* Results: all format grid */}

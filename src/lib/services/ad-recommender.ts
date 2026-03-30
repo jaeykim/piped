@@ -35,6 +35,11 @@ Available concepts:
 - "social-proof": Use numbers, reviews, ratings to build trust
 - "offer": Highlight free trial, discount, or limited offer
 - "how-it-works": Visualize how simple the product is to use
+- "before-after": Show transformation before and after using the product
+- "comparison": Direct comparison vs competitors showing why we're better
+- "urgency": Drive action with time/quantity limits (limited offer, countdown)
+- "story": Tell a real user success story to build connection
+- "question": Spark curiosity with a provocative question
 
 Available subjects (visual style):
 - "graphic-card": Bold background color + large text overlay (most common Korean Meta ad style)

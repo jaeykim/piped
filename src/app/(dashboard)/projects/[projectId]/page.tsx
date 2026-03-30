@@ -14,11 +14,16 @@ import {
   CheckCircle,
   Lock,
   BarChart3,
+  Target,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 import { doc, getDoc } from "firebase/firestore";
-import { getDb } from "@/lib/firebase/client";
+import { getDb, getAuth_ } from "@/lib/firebase/client";
 import { useLocale } from "@/context/locale-context";
+import { useToast } from "@/components/ui/toast";
 import { PipelineStepper } from "@/components/pipeline/pipeline-stepper";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FullPageSpinner } from "@/components/ui/spinner";
@@ -33,6 +38,9 @@ export default function ProjectDetailPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [analysis, setAnalysis] = useState<SiteAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
+  const [competitors, setCompetitors] = useState<{ competitors: { name: string; positioning: string; adStrategy: string; strengths: string[]; weaknesses: string[] }[]; ourAdvantages: string[]; recommendedAngles: { angle: string; description: string; example: string }[]; marketInsight: string } | null>(null);
+  const [loadingCompetitors, setLoadingCompetitors] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     async function load() {
@@ -42,6 +50,10 @@ export default function ProjectDetailPage() {
 
       const analysisSnap = await getDoc(doc(getDb(), "projects", projectId, "analysis", "result"));
       if (analysisSnap.exists()) setAnalysis(analysisSnap.data() as SiteAnalysis);
+
+      // Load cached competitor analysis
+      const compSnap = await getDoc(doc(getDb(), "projects", projectId, "analysis", "competitors"));
+      if (compSnap.exists()) setCompetitors(compSnap.data() as typeof competitors);
 
       setLoading(false);
     }
@@ -197,6 +209,102 @@ export default function ProjectDetailPage() {
               </div>
             )}
           </CardContent>
+        </Card>
+      )}
+
+      {/* Competitor Analysis */}
+      {analysis && (
+        <Card className="mt-6">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-orange-600" />
+                <h2 className="font-semibold text-gray-900">{isKo ? "경쟁사 분석" : "Competitor Analysis"}</h2>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={async () => {
+                  setLoadingCompetitors(true);
+                  try {
+                    const token = await getAuth_().currentUser?.getIdToken();
+                    const res = await fetch("/api/analyze/competitors", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                      body: JSON.stringify({ projectId }),
+                    });
+                    if (res.ok) {
+                      const data = await res.json();
+                      setCompetitors(data);
+                      toast("success", isKo ? "경쟁사 분석 완료" : "Competitor analysis complete");
+                    }
+                  } catch {
+                    toast("error", isKo ? "분석 실패" : "Analysis failed");
+                  }
+                  setLoadingCompetitors(false);
+                }}
+                disabled={loadingCompetitors}
+              >
+                {loadingCompetitors ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+                {competitors ? (isKo ? "재분석" : "Re-analyze") : (isKo ? "AI 분석 시작" : "Start AI Analysis")}
+              </Button>
+            </div>
+          </CardHeader>
+          {competitors && (
+            <CardContent className="space-y-4">
+              {/* Market Insight */}
+              <div className="rounded-lg bg-blue-50 p-3">
+                <p className="text-xs text-blue-800">{competitors.marketInsight}</p>
+              </div>
+
+              {/* Competitors */}
+              <div className="space-y-2">
+                {competitors.competitors.map((comp, i) => (
+                  <div key={i} className="rounded-lg border border-gray-200 p-3">
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium text-gray-900">{comp.name}</p>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-600">{comp.positioning}</p>
+                    <p className="mt-1 text-xs text-gray-500">{isKo ? "광고 전략" : "Ad strategy"}: {comp.adStrategy}</p>
+                    <div className="mt-2 flex gap-4 text-[10px]">
+                      <div>
+                        <span className="font-medium text-green-700">{isKo ? "강점" : "Strengths"}:</span>
+                        <span className="text-gray-500"> {comp.strengths.join(", ")}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium text-red-600">{isKo ? "약점" : "Weaknesses"}:</span>
+                        <span className="text-gray-500"> {comp.weaknesses.join(", ")}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Our Advantages */}
+              <div className="rounded-lg bg-green-50 p-3">
+                <p className="text-xs font-semibold text-green-900 mb-1">{isKo ? "우리의 차별점" : "Our Advantages"}</p>
+                <ul className="space-y-0.5">
+                  {competitors.ourAdvantages.map((adv, i) => (
+                    <li key={i} className="text-xs text-green-800">• {adv}</li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Recommended Ad Angles */}
+              <div>
+                <p className="text-xs font-semibold text-gray-700 mb-2">{isKo ? "추천 광고 전략" : "Recommended Ad Angles"}</p>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {competitors.recommendedAngles.map((angle, i) => (
+                    <div key={i} className="rounded-lg border border-indigo-200 bg-indigo-50 p-3">
+                      <p className="text-xs font-semibold text-indigo-900">{angle.angle}</p>
+                      <p className="mt-1 text-[10px] text-indigo-700">{angle.description}</p>
+                      <p className="mt-2 text-[10px] font-medium text-indigo-800 italic">&quot;{angle.example}&quot;</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          )}
         </Card>
       )}
 

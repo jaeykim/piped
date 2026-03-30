@@ -133,15 +133,29 @@ export async function selectCopyTrio(
   if (headlines.length > 0 && descriptions.length > 0) {
     try {
       const res = await callClaude(
-        "You are an ad copy expert. Pick the best headline + subheadline + CTA combination for the given ad concept. Return ONLY valid JSON.",
+        `You are a Korean performance marketing expert specializing in Meta/Instagram ads. Pick and ENHANCE the best headline + subheadline + CTA for the given concept. Return ONLY valid JSON.
+
+Rules for the headline (most important):
+- MAX 3-5 words. This goes on an ad image.
+- Include a SPECIFIC NUMBER when possible (%, 원, 배, 명, 분, 시간)
+- For "urgency": add time pressure ("이번 주만", "선착순 100명")
+- For "question": make it provocative and curiosity-inducing
+- For "before-after": show the contrast ("하루 3시간? → 3분")
+- For "social-proof": lead with the number ("10,000+ 팀")
+- For "offer": lead with the discount/free ("지금 무료", "50% 할인")
+- For "comparison": name the old way vs new ("수동 vs AI")
+- For "story": use first-person voice ("월 매출 0원이었는데")
+- For "pain-point": start with the pain ("아직도 ~하세요?")
+- For "benefit-driven": state the result ("3분 만에 완성")
+DO NOT use full sentences. Short, punchy, hooking.`,
         `Pick the best combination for a "${concept}" ad concept${language ? ` in ${language}` : ""}.
 
 Available headlines: ${JSON.stringify(headlines)}
 Available descriptions: ${JSON.stringify(descriptions)}
 Available CTAs: ${JSON.stringify(ctas)}
 
-Return JSON: {"headline": "...", "subheadline": "...", "cta": "..."}
-Pick the combination that creates the strongest emotional hook for "${concept}".`
+You may slightly MODIFY the selected headline to make it punchier (add numbers, shorten, add urgency).
+Return JSON: {"headline": "...", "subheadline": "...", "cta": "..."}`
       );
       const match = res.match(/\{[\s\S]*\}/);
       if (match) return JSON.parse(match[0]) as CopyTrio;

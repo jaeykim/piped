@@ -1,0 +1,102 @@
+import { NextRequest, NextResponse } from "next/server";
+import { adminAuth, adminDb } from "@/lib/firebase/admin";
+import Anthropic from "@anthropic-ai/sdk";
+import type { SiteAnalysis } from "@/types/analysis";
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+export const maxDuration = 60;
+
+/**
+ * Analyze competitors based on site analysis data.
+ * POST /api/analyze/competitors
+ * Body: { projectId }
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const authHeader = request.headers.get("authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const token = authHeader.split("Bearer ")[1];
+    const decoded = await adminAuth.verifyIdToken(token);
+    const uid = decoded.uid;
+
+    const { projectId } = await request.json();
+
+    const projectSnap = await adminDb.doc(`projects/${projectId}`).get();
+    if (!projectSnap.exists || projectSnap.data()?.ownerId !== uid) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    const analysisSnap = await adminDb.doc(`projects/${projectId}/analysis/result`).get();
+    if (!analysisSnap.exists) {
+      return NextResponse.json({ error: "Analysis not found" }, { status: 400 });
+    }
+
+    const analysis = analysisSnap.data() as SiteAnalysis;
+
+    const msg = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1500,
+      system: `You are a competitive intelligence analyst specializing in digital marketing. Return ONLY valid JSON with no markdown.`,
+      messages: [{
+        role: "user",
+        content: `Analyze the competitive landscape for this product and identify key competitors and their ad strategies.
+
+Product: ${analysis.productName}
+What it does: ${analysis.valueProposition}
+Industry: ${analysis.industry}
+Target audience: ${analysis.targetAudience.join(", ")}
+Key features: ${analysis.keyFeatures.join(", ")}
+
+Return a JSON object:
+{
+  "competitors": [
+    {
+      "name": "Competitor name",
+      "url": "competitor website URL",
+      "positioning": "How they position themselves (1 sentence)",
+      "adStrategy": "Their likely ad strategy based on industry knowledge",
+      "strengths": ["strength 1", "strength 2"],
+      "weaknesses": ["weakness 1", "weakness 2"]
+    }
+  ],
+  "ourAdvantages": ["What makes ${analysis.productName} different from competitors"],
+  "recommendedAngles": [
+    {
+      "angle": "Ad angle name",
+      "description": "Why this angle works against competitors",
+      "example": "Example ad headline"
+    }
+  ],
+  "marketInsight": "One paragraph market overview"
+}
+
+Include 3-5 competitors and 3 recommended ad angles. Be specific and actionable.`
+      }],
+    });
+
+    const text = msg.content[0].type === "text" ? msg.content[0].text : "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      return NextResponse.json({ error: "Failed to parse response" }, { status: 500 });
+    }
+
+    const result = JSON.parse(jsonMatch[0]);
+
+    // Cache result in Firestore
+    await adminDb.doc(`projects/${projectId}/analysis/competitors`).set({
+      ...result,
+      analyzedAt: new Date().toISOString(),
+    });
+
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error("Competitor analysis error:", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Analysis failed" },
+      { status: 500 }
+    );
+  }
+}

@@ -134,9 +134,30 @@ export async function POST(request: NextRequest) {
 
     if (subject === "graphic-card") {
       const autoTags = analysis.keyFeatures.filter((f) => f.length <= 12).slice(0, 4);
-      const cardStyle = concept === "offer" || concept === "pain-point" ? "dark" as const
-        : concept === "social-proof" ? "light" as const
-        : "gradient" as const;
+      // ZET-inspired style selection based on concept
+      const styleMap: Record<string, "light" | "dark" | "gradient" | "bold" | "review"> = {
+        "benefit-driven": "gradient",
+        "pain-point": "dark",
+        "social-proof": "light",
+        "offer": "bold",
+        "how-it-works": "light",
+        "before-after": "dark",
+        "comparison": "light",
+        "urgency": "bold",
+        "story": "review",
+        "question": "gradient",
+      };
+      const cardStyle = styleMap[concept] || "gradient";
+
+      // ZET-style top banner for high-urgency/attention concepts
+      const topBannerMap: Record<string, string> = {
+        "urgency": "지금 안 보면 놓칩니다",
+        "offer": "기간 한정 특가",
+        "pain-point": "이 고민, 해결됩니다",
+        "before-after": "사용 전후 비교",
+        "question": "잠깐, 이거 알고 계셨나요?",
+      };
+      const topBanner = topBannerMap[concept];
 
       // Auto-detect highlight words (numbers, product name, key terms)
       const headlineText = copyTrio.headline || finalOverlay;
@@ -147,11 +168,20 @@ export async function POST(request: NextRequest) {
       // Highlight product name if it appears
       if (headlineText.includes(analysis.productName)) highlightWords.push(analysis.productName);
 
-      // Auto badge based on concept
-      const autoBadge = concept === "offer" ? "혜택" :
-        concept === "social-proof" ? "인기" :
-        concept === "how-it-works" ? "간편" :
-        undefined;
+      // Auto badge based on concept (ZET-style Korean ad patterns)
+      const badgeMap: Record<string, string> = {
+        "offer": "혜택",
+        "social-proof": "인기",
+        "how-it-works": "간편",
+        "before-after": "변화",
+        "comparison": "비교",
+        "urgency": "긴급",
+        "story": "후기",
+        "question": "궁금",
+        "benefit-driven": "추천",
+        "pain-point": "해결",
+      };
+      const autoBadge = badgeMap[concept];
 
       const cardConfig = {
         headline: headlineText,
@@ -159,6 +189,7 @@ export async function POST(request: NextRequest) {
         subheadline: copyTrio.subheadline,
         cta: copyTrio.cta || "자세히 보기 →",
         badge: autoBadge,
+        topBanner,
         productName: analysis.productName,
         brandColor: analysis.brandColors[0] || "#4F46E5",
         size,
