@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Download, Type, Sun, Contrast, X, RotateCcw, Eye, EyeOff, GripVertical } from "lucide-react";
+import { Download, Type, Sun, Contrast, X, RotateCcw, Eye, EyeOff, GripVertical, Check } from "lucide-react";
 
 export interface CreativeEditorData {
   baseImage: string;
@@ -28,6 +28,7 @@ interface TextLayer {
 interface Props {
   data: CreativeEditorData;
   onClose: () => void;
+  onSave?: (dataUrl: string) => void;
 }
 
 // Smart Korean word wrap
@@ -68,7 +69,7 @@ function smartWrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
   return result;
 }
 
-export function CreativeEditor({ data, onClose }: Props) {
+export function CreativeEditor({ data, onClose, onSave }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [baseImg, setBaseImg] = useState<HTMLImageElement | null>(null);
   const [overlayImg, setOverlayImg] = useState<HTMLImageElement | null>(null);
@@ -80,7 +81,7 @@ export function CreativeEditor({ data, onClose }: Props) {
   const [brightness, setBrightness] = useState(100);
   const [contrast, setContrast] = useState(100);
   const [saturation, setSaturation] = useState(100);
-  const [overlayOpacity, setOverlayOpacity] = useState(40);
+  const [overlayOpacity, setOverlayOpacity] = useState(data.isComplete ? 0 : 40);
 
   // Text layers — hidden by default for graphic cards (text already baked in)
   const showText = !data.isComplete;
@@ -431,7 +432,16 @@ export function CreativeEditor({ data, onClose }: Props) {
 
         {/* Actions */}
         <div className="mt-4 space-y-2">
-          <Button onClick={handleDownload} className="w-full" size="sm">
+          {onSave && (
+            <Button onClick={() => {
+              const canvas = canvasRef.current;
+              if (!canvas) return;
+              onSave(canvas.toDataURL("image/png"));
+            }} className="w-full" size="sm">
+              <Check className="mr-2 h-4 w-4" /> 적용
+            </Button>
+          )}
+          <Button onClick={handleDownload} className="w-full" size="sm" variant={onSave ? "outline" : "primary"}>
             <Download className="mr-2 h-4 w-4" /> 다운로드
           </Button>
           <Button variant="outline" onClick={handleReset} className="w-full" size="sm">

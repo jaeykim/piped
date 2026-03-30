@@ -160,8 +160,8 @@ export default function SettingsPage() {
       const { url } = await res.json();
       if (url) { window.location.href = url; return; }
       throw new Error("No checkout URL returned");
-    } catch {
-      toast("error", "충전에 실패했습니다");
+    } catch (error) {
+      toast("error", error instanceof Error ? error.message : "충전에 실패했습니다");
     } finally {
       setBuyingPack(null);
     }

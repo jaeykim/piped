@@ -57,8 +57,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ url: session.url });
   } catch (error) {
     console.error("Checkout error:", error);
+    const message = error instanceof Error ? error.message : "Checkout failed";
+    if (message === "STRIPE_NOT_CONFIGURED") {
+      return NextResponse.json(
+        { error: "Stripe is not configured. Please set STRIPE_SECRET_KEY in your environment variables." },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Checkout failed" },
+      { error: message },
       { status: 500 }
     );
   }

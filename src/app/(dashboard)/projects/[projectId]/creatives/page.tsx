@@ -1243,6 +1243,22 @@ export default function CreativesPage() {
         <CreativeEditor
           data={editingCreative}
           onClose={() => setEditingCreative(null)}
+          onSave={(dataUrl) => {
+            // Apply edited image back to the creative
+            if (creative) {
+              const editedSize = editingCreative.size;
+              setCreative({
+                ...creative,
+                formats: creative.formats.map((f) =>
+                  f.size === editedSize ? { ...f, baseImage: dataUrl } : f
+                ),
+                // If editing the base image size, update baseImage too
+                baseImage: editedSize === creative.size ? dataUrl : creative.baseImage,
+              });
+            }
+            setEditingCreative(null);
+            toast("success", isKo ? "편집이 적용되었습니다" : "Edit applied");
+          }}
         />
       )}
     </div>
