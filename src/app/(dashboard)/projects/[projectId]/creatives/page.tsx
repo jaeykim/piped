@@ -398,6 +398,10 @@ export default function CreativesPage() {
 
   const handleGenerateVideo = async () => {
     if (!creative) return;
+    if (!creative.baseImage || !creative.baseImage.startsWith("data:")) {
+      toast("error", isKo ? "이미지가 없습니다. 먼저 이미지를 생성해주세요." : "No image found. Generate an image first.");
+      return;
+    }
     setGeneratingVideo(true);
     setVideoUrl(null);
     try {
@@ -406,6 +410,10 @@ export default function CreativesPage() {
       const base64 = creative.baseImage.split(",")[1];
       const mimeMatch = creative.baseImage.match(/data:([^;]+)/);
       const mimeType = mimeMatch?.[1] || "image/png";
+
+      if (!base64) {
+        throw new Error(isKo ? "이미지 데이터를 읽을 수 없습니다" : "Cannot read image data");
+      }
 
       const res = await fetch("/api/creatives/video", {
         method: "POST",

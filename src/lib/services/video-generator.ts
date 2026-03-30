@@ -22,11 +22,16 @@ function sleep(ms: number) {
 export async function generateVideoFromImage(
   request: VideoRequest
 ): Promise<GeneratedVideo> {
+  if (!process.env.GOOGLE_AI_API_KEY) {
+    throw new Error("GOOGLE_AI_API_KEY is not configured. Set it in your environment variables.");
+  }
+
   const duration = request.durationSeconds || 5;
 
   // Start video generation (async operation)
+  const model = process.env.GOOGLE_VIDEO_MODEL || "veo-2.0-generate-001";
   const operation = await ai.models.generateVideos({
-    model: "veo-3.0-fast-generate-001",
+    model,
     image: {
       imageBytes: request.imageBase64,
       mimeType: request.imageMimeType,
