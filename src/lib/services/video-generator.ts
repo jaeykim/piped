@@ -67,6 +67,21 @@ export async function generateVideoFromImage(
     throw new Error("No video in response");
   }
 
+  // If we have a URI, download server-side with API key (client can't access directly)
+  if (video.uri && !video.videoBytes) {
+    const separator = video.uri.includes("?") ? "&" : "?";
+    const authUrl = `${video.uri}${separator}key=${process.env.GOOGLE_AI_API_KEY}`;
+    const dlRes = await fetch(authUrl);
+    if (!dlRes.ok) {
+      throw new Error(`Failed to download video: ${dlRes.status} ${dlRes.statusText}`);
+    }
+    const buffer = Buffer.from(await dlRes.arrayBuffer());
+    return {
+      videoBytes: buffer.toString("base64"),
+      mimeType: video.mimeType || "video/mp4",
+    };
+  }
+
   return {
     videoUri: video.uri,
     videoBytes: video.videoBytes,
