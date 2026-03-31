@@ -114,6 +114,52 @@ export async function generateAllCopy(
   return results;
 }
 
+export interface AppealPoint {
+  text: string;
+  type: "hook" | "benefit" | "proof";
+  role: "primary" | "secondary";
+}
+
+export async function generateAppealPoints(
+  analysis: SiteAnalysis,
+  language?: string
+): Promise<AppealPoint[]> {
+  const lang = language || "Korean";
+  const res = await callClaude(
+    `You are a top-tier performance marketer who writes ZET-style appeal points (소구점) for ads.
+Each appeal point is a short, punchy statement that captures ONE reason why the target audience should care about the product.
+
+Rules:
+- Generate 3-5 appeal points
+- Each must be 1 short sentence, MAX 15 words
+- Types:
+  - "hook": provocative attention grabber that stops the scroll (e.g. "DM 지옥이던 열린 원장님이 나 몰래 쓰던 예약 솔루션")
+  - "benefit": clear outcome the user gets (e.g. "매일 3시간 절약, 매출은 2배")
+  - "proof": social proof or concrete numbers (e.g. "이미 10,000개 팀이 선택")
+- Include at least 1 hook and 1 benefit
+- Be specific to THIS product — no generic filler
+- Write in ${lang}
+
+Return ONLY a JSON array:
+[{"text": "...", "type": "hook|benefit|proof"}, ...]`,
+    `Product: ${analysis.productName}
+Value Proposition: ${analysis.valueProposition || "N/A"}
+Key Features: ${(analysis.keyFeatures || []).join(", ") || "N/A"}
+Target Audience: ${(analysis.targetAudience || []).join(", ") || "N/A"}
+Industry: ${analysis.industry || "N/A"}
+
+Generate appeal points.`
+  );
+
+  const parsed = parseJson(res) as { text: string; type: "hook" | "benefit" | "proof" }[];
+
+  return parsed.map((point, i) => ({
+    text: point.text,
+    type: point.type,
+    role: i === 0 ? "primary" as const : "secondary" as const,
+  }));
+}
+
 export interface CopyTrio {
   headline: string;
   subheadline: string;
@@ -123,11 +169,21 @@ export interface CopyTrio {
 export async function selectCopyTrio(
   variants: { type: string; content: string }[],
   concept: string,
-  language?: string
+  language?: string,
+  appealPoints?: AppealPoint[]
 ): Promise<CopyTrio> {
   const headlines = variants.filter((v) => v.type === "headline").map((v) => v.content);
   const descriptions = variants.filter((v) => ["description_short", "description_long"].includes(v.type)).map((v) => v.content);
   const ctas = variants.filter((v) => v.type === "cta").map((v) => v.content);
+
+  const primaryAppeal = appealPoints?.find((a) => a.role === "primary");
+  const secondaryAppeals = appealPoints?.filter((a) => a.role === "secondary") || [];
+  const appealSection = appealPoints?.length
+    ? `\n\nAppeal Points (소구점) — use these to guide headline/subheadline selection:
+Primary: "${primaryAppeal?.text || ""}" (${primaryAppeal?.type || ""})
+Secondary: ${secondaryAppeals.map((a) => `"${a.text}" (${a.type})`).join(", ") || "none"}
+The headline MUST reflect the primary appeal point's message. The subheadline may incorporate secondary appeal points.`
+    : "";
 
   // If we have enough variants, let Claude pick the best combo
   if (headlines.length > 0 && descriptions.length > 0) {
@@ -152,7 +208,7 @@ DO NOT use full sentences. Short, punchy, hooking.`,
 
 Available headlines: ${JSON.stringify(headlines)}
 Available descriptions: ${JSON.stringify(descriptions)}
-Available CTAs: ${JSON.stringify(ctas)}
+Available CTAs: ${JSON.stringify(ctas)}${appealSection}
 
 You may slightly MODIFY the selected headline to make it punchier (add numbers, shorten, add urgency).
 Return JSON: {"headline": "...", "subheadline": "...", "cta": "..."}`
@@ -165,8 +221,8 @@ Return JSON: {"headline": "...", "subheadline": "...", "cta": "..."}`
   }
 
   return {
-    headline: headlines[0] || "Get Started Today",
-    subheadline: descriptions[0] || "",
+    headline: primaryAppeal?.text || headlines[0] || "Get Started Today",
+    subheadline: secondaryAppeals[0]?.text || descriptions[0] || "",
     cta: ctas[0] || "Try Free",
   };
 }

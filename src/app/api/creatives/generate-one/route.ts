@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     const decoded = await adminAuth.verifyIdToken(token);
     const uid = decoded.uid;
 
-    const { projectId, size, platform, concept, subject, overlayText, userImage, language, country } = await request.json();
+    const { projectId, size, platform, concept, subject, overlayText, userImage, language, country, appealPoints, ctaText } = await request.json();
 
     // Check credits (graphic-card is cheaper than AI photo)
     const creditAction = subject === "graphic-card" ? "creative-graphic" : "creative-ai";
@@ -127,6 +127,15 @@ export async function POST(request: NextRequest) {
       console.error("Smart copy trio failed:", e);
     }
 
+    // Override copy trio with user-selected appeal points / CTA
+    if (appealPoints?.length) {
+      if (appealPoints[0]) copyTrio.headline = appealPoints[0];
+      if (appealPoints[1]) copyTrio.subheadline = appealPoints[1];
+    }
+    if (ctaText) {
+      copyTrio.cta = ctaText;
+    }
+
     // Use overlayText if provided, otherwise use the smart headline
     const finalOverlay = overlayText || copyTrio.headline;
 
@@ -157,7 +166,15 @@ export async function POST(request: NextRequest) {
         "before-after": "사용 전후 비교",
         "question": "잠깐, 이거 알고 계셨나요?",
       };
-      const topBanner = topBannerMap[concept];
+      let topBanner = topBannerMap[concept];
+
+      // Override topBanner/headline with appeal points if provided
+      if (appealPoints?.length) {
+        // First appeal point as topBanner if it's short/hook-like (≤20 chars)
+        if (appealPoints[0] && appealPoints[0].length <= 20) {
+          topBanner = appealPoints[0];
+        }
+      }
 
       // Auto-detect highlight words (numbers, product name, key terms)
       const headlineText = copyTrio.headline || finalOverlay;

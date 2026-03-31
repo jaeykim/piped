@@ -135,6 +135,8 @@ export default function CreativesPage() {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null); // base64 data URL
   const [copyVariants, setCopyVariants] = useState<CopyVariant[]>([]);
   const [loadingCopy, setLoadingCopy] = useState(false);
+  const [appealPoints, setAppealPoints] = useState<{ text: string; role: "primary" | "secondary" | "none" }[]>([]);
+  const [customCta, setCustomCta] = useState("");
 
   // Generation state
   const [creative, setCreative] = useState<GeneratedCreative | null>(null);
@@ -224,6 +226,20 @@ export default function CreativesPage() {
     loadCopyVariants();
   }, [loadCopyVariants]);
 
+  // Generate appeal points from copy variants when entering copy step
+  useEffect(() => {
+    if (step === "copy" && appealPoints.length === 0 && copyVariants.length > 0) {
+      const points = copyVariants
+        .filter((v) => ["headline", "description_short"].includes(v.type))
+        .slice(0, 8)
+        .map((v, i) => ({
+          text: v.isEdited && v.editedContent ? v.editedContent : v.content,
+          role: (i === 0 ? "primary" : "none") as "primary" | "secondary" | "none",
+        }));
+      if (points.length > 0) setAppealPoints(points);
+    }
+  }, [step, copyVariants]);
+
   const startTimer = () => {
     setElapsed(0);
     if (timerRef.current) clearInterval(timerRef.current);
@@ -262,6 +278,8 @@ export default function CreativesPage() {
           subject: selectedSubject,
           overlayText: selectedCopy || undefined,
           userImage: uploadedImage || undefined,
+          appealPoints: appealPoints.filter((a) => a.role !== "none").map((a) => ({ text: a.text, role: a.role })),
+          ctaText: customCta || undefined,
           language: LANGUAGES.find((l) => l.code === selectedLanguage)?.label,
           country: COUNTRIES.find((c) => c.code === selectedCountry)?.label,
         }),
@@ -469,6 +487,8 @@ export default function CreativesPage() {
     setCreative(null);
     setSelectedCopy("");
     setUploadedImage(null);
+    setAppealPoints([]);
+    setCustomCta("");
     setCreative(null);
   };
 
@@ -962,6 +982,102 @@ export default function CreativesPage() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Appeal Points */}
+        {appealPoints.length > 0 && (
+          <div className="mt-8">
+            <h2 className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <Target className="h-4 w-4" />
+              {isKo ? "소구점 선택" : "Select Appeal Points"}
+            </h2>
+            <p className="mt-0.5 text-xs text-gray-400">
+              {isKo
+                ? "AI가 분석한 소구점입니다. 핵심과 보조를 선택하세요."
+                : "AI-generated appeal points. Select primary and secondary."}
+            </p>
+            <div className="mt-3 space-y-2">
+              {appealPoints.map((point, idx) => (
+                <div
+                  key={idx}
+                  className={`flex items-center justify-between rounded-lg border px-4 py-3 transition-all ${
+                    point.role === "primary"
+                      ? "border-indigo-500 bg-indigo-50"
+                      : point.role === "secondary"
+                        ? "border-gray-400 bg-gray-50"
+                        : "border-gray-200 bg-white"
+                  }`}
+                >
+                  <p className="text-sm text-gray-900 mr-3">{point.text}</p>
+                  <div className="flex shrink-0 gap-1.5">
+                    <button
+                      onClick={() =>
+                        setAppealPoints((prev) =>
+                          prev.map((p, i) => ({
+                            ...p,
+                            role:
+                              i === idx
+                                ? p.role === "primary"
+                                  ? "none"
+                                  : "primary"
+                                : p.role === "primary"
+                                  ? "none"
+                                  : p.role,
+                          }))
+                        )
+                      }
+                      className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                        point.role === "primary"
+                          ? "bg-indigo-600 text-white"
+                          : "bg-gray-100 text-gray-500 hover:bg-indigo-100 hover:text-indigo-600"
+                      }`}
+                    >
+                      {isKo ? "핵심" : "Primary"}
+                    </button>
+                    <button
+                      onClick={() =>
+                        setAppealPoints((prev) =>
+                          prev.map((p, i) =>
+                            i === idx
+                              ? { ...p, role: p.role === "secondary" ? "none" : "secondary" }
+                              : p
+                          )
+                        )
+                      }
+                      className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                        point.role === "secondary"
+                          ? "bg-gray-600 text-white"
+                          : "bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+                      }`}
+                    >
+                      {isKo ? "보조" : "Secondary"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* CTA Input */}
+        <div className="mt-6">
+          <h2 className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
+            <Megaphone className="h-4 w-4" />
+            {isKo ? "행동 유도 문구 (CTA)" : "Call to Action (CTA)"}
+          </h2>
+          <input
+            type="text"
+            value={customCta}
+            onChange={(e) => setCustomCta(e.target.value)}
+            placeholder={isKo ? "예: 지금 바로 50% 할인 받기" : "e.g. Get 50% off now"}
+            className="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            maxLength={60}
+          />
+          <p className="mt-1 text-xs text-gray-400">
+            {isKo
+              ? "버튼이나 하단 배너에 들어갈 문구를 작성해주세요"
+              : "Text for buttons or bottom banner in the creative"}
+          </p>
         </div>
 
         <div className="mt-8 flex items-center justify-between">
