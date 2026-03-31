@@ -253,11 +253,12 @@ export async function POST(request: NextRequest) {
         }
 
         if (screenshotBuffer) {
-          // Create a device mockup from the screenshot
-          const mockW = Math.round(cw * 0.4);
-          const mockH = Math.round(mockW * 0.62);
+          // ZET-style: prominent screenshot in the middle section of the card
+          const isSquare = Math.abs(cw - ch) < 100;
+          const mockW = Math.round(cw * (isSquare ? 0.5 : 0.45));
+          const mockH = Math.round(mockW * 0.65);
           const mockX = cw - mockW - Math.round(cw * 0.04);
-          const mockY = ch - mockH - Math.round(ch * 0.1);
+          const mockY = Math.round(ch * 0.35); // middle area, not bottom corner
 
           // Resize screenshot to fit mockup, add rounded corners via SVG mask
           const ssResized = await sharp(screenshotBuffer)

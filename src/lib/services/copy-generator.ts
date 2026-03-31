@@ -133,9 +133,12 @@ Rules:
 - Generate 3-5 appeal points
 - Each must be 1 short sentence, MAX 15 words
 - Types:
-  - "hook": provocative attention grabber that stops the scroll (e.g. "DM 지옥이던 열린 원장님이 나 몰래 쓰던 예약 솔루션")
-  - "benefit": clear outcome the user gets (e.g. "매일 3시간 절약, 매출은 2배")
-  - "proof": social proof or concrete numbers (e.g. "이미 10,000개 팀이 선택")
+  - "hook": provocative attention grabber that stops the scroll. Use patterns like:
+    * "[직업]이 나 몰래 쓰던 [제품]" (e.g. "열 살 원장님이 나 몰래 쓰던 예약 솔루션")
+    * "아직도 [고통]하고 계세요?" (e.g. "아직도 수동으로 마케팅하고 계세요?")
+    * "[놀라운 사실]인 줄 알았던 [제품명]" (e.g. "빼빠라인인줄 알았던 친구가 나 몰래 먹었던 그 제품")
+  - "benefit": clear outcome the user gets with SPECIFIC NUMBERS (e.g. "매일 3시간 절약, 매출은 2배", "하루 833원으로 해결")
+  - "proof": social proof or concrete numbers (e.g. "이미 10,000개 팀이 선택", "만족도 4.9")
 - Include at least 1 hook and 1 benefit
 - Be specific to THIS product — no generic filler
 - Write in ${lang}

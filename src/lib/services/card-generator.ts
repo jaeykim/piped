@@ -150,7 +150,8 @@ function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: nu
   const pad = Math.round(ref * 0.07);
   const isDark = config.style === "dark" || config.style === "bold";
 
-  const baseHeadSize = Math.round(ref * (isLandscape ? 0.12 : 0.075));
+  // ZET uses very large, bold headlines
+  const baseHeadSize = Math.round(ref * (isLandscape ? 0.13 : 0.085));
   const subSize = Math.round(ref * (isLandscape ? 0.055 : 0.034));
   const ctaSize = Math.round(ref * (isLandscape ? 0.05 : 0.03));
   const badgeSize = Math.round(ref * 0.022);
@@ -162,16 +163,16 @@ function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: nu
   const tagText = isDark ? "rgba(255,255,255,0.9)" : `rgb(${r},${g},${b})`;
   const maxTextW = w - pad * 2;
 
-  // Top banner (ZET-style red/yellow strip) — e.g. "이 광고 안 보면 손해 봅니다"
+  // Top banner (ZET-style red strip) — e.g. "이 광고 안 보면 손해 봅니다"
   let topBannerSvg = "";
   let y = pad;
   if (config.topBanner) {
-    const bannerH = Math.round(ref * 0.06);
-    const bannerFontSize = Math.round(ref * 0.028);
+    const bannerH = Math.round(ref * 0.075);
+    const bannerFontSize = Math.round(ref * 0.032);
     topBannerSvg = `
       <rect x="0" y="0" width="${w}" height="${bannerH}" fill="#E53E3E"/>
-      <text x="${w / 2}" y="${bannerH / 2 + bannerFontSize * 0.35}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="900" font-size="${bannerFontSize}" fill="#FFFFFF" text-anchor="middle">${esc(config.topBanner)}</text>`;
-    y = bannerH + ref * 0.02;
+      <text x="${w / 2}" y="${bannerH / 2 + bannerFontSize * 0.35}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="900" font-size="${bannerFontSize}" fill="#FFFFFF" text-anchor="middle" letter-spacing="0.02em">${esc(config.topBanner)}</text>`;
+    y = bannerH + ref * 0.015;
   }
 
   // Badge (top, above headline) — e.g. "출시특가", "기간 한정"
@@ -206,22 +207,22 @@ function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: nu
   const headSvg = headLines.map((line, i) => {
     const ly = y + headSize + i * lineH;
 
-    // Check if any highlight word is in this line
+    // ZET-style highlights: bright yellow/red background on key words (not translucent)
     let highlightSvg = "";
     for (const hw of highlights) {
       const idx = line.indexOf(hw);
       if (idx >= 0) {
-        // Calculate approximate position of the highlight word
         const isCJK = /[\u3000-\u9fff\uac00-\ud7af]/.test(hw);
         const charW = headSize * (isCJK ? 0.95 : 0.6);
         const beforeW = idx * charW;
         const wordW = hw.length * charW;
         const hlX = pad + beforeW;
         const hlY = ly - headSize * 0.85;
-        const hlH = headSize * 1.1;
-        const hlPad = headSize * 0.1;
-        // Highlight rectangle behind the word
-        highlightSvg += `<rect x="${hlX - hlPad}" y="${hlY}" width="${wordW + hlPad * 2}" height="${hlH}" rx="4" fill="rgb(${r},${g},${b})" opacity="${isDark ? 0.4 : 0.2}"/>`;
+        const hlH = headSize * 1.15;
+        const hlPad = headSize * 0.15;
+        // ZET uses bright yellow (#FFE500) or brand color as SOLID highlight
+        const hlColor = isDark ? "#FFE500" : `rgb(${r},${g},${b})`;
+        highlightSvg += `<rect x="${hlX - hlPad}" y="${hlY}" width="${wordW + hlPad * 2}" height="${hlH}" rx="4" fill="${hlColor}" opacity="${isDark ? 0.95 : 0.25}"/>`;
       }
     }
 
@@ -233,14 +234,20 @@ function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: nu
   const accent = `<rect x="${pad}" y="${y}" width="${w * 0.08}" height="${Math.round(ref * 0.005)}" rx="2" fill="rgb(${r},${g},${b})" opacity="${isDark ? 0.7 : 0.5}"/>`;
   y += ref * 0.025;
 
-  // Subheadline
+  // Subheadline — ZET style: each line has a subtle background strip for readability
   let subSvg = "";
   if (config.subheadline) {
     const subLines = wrapText(config.subheadline, subSize, maxTextW);
     subSvg = subLines.slice(0, 3).map((line, i) => {
-      return `<text x="${pad}" y="${y + subSize + i * (subSize * 1.4)}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="500" font-size="${subSize}" fill="${subColor}">${esc(line)}</text>`;
+      const ly = y + subSize + i * (subSize * 1.5);
+      const isCJK = /[\u3000-\u9fff\uac00-\ud7af]/.test(line);
+      const lineW = line.length * subSize * (isCJK ? 0.95 : 0.6);
+      const stripH = subSize * 1.3;
+      const stripBg = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.04)";
+      return `<rect x="${pad - 4}" y="${ly - subSize * 0.9}" width="${lineW + 8}" height="${stripH}" rx="3" fill="${stripBg}"/>
+        <text x="${pad}" y="${ly}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="600" font-size="${subSize}" fill="${subColor}">${esc(line)}</text>`;
     }).join("");
-    y += subLines.slice(0, 3).length * (subSize * 1.4) + subSize * 0.3;
+    y += subLines.slice(0, 3).length * (subSize * 1.5) + subSize * 0.3;
   }
 
   // Tags
@@ -263,14 +270,17 @@ function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: nu
     y += tagH + ref * 0.015;
   }
 
-  // CTA
+  // CTA — ZET-style full-width bottom banner (yellow/brand background)
   let ctaSvg = "";
   if (config.cta) {
-    y += ref * 0.02;
-    const ctaW = config.cta.length * ctaSize * 0.85 + ctaSize * 4;
-    const ctaH = ctaSize * 2.8;
-    ctaSvg = `<rect x="${pad}" y="${y}" width="${ctaW}" height="${ctaH}" rx="${ctaH / 2}" fill="rgb(${r},${g},${b})"/>
-      <text x="${pad + ctaW / 2}" y="${y + ctaH / 2 + ctaSize * 0.35}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="700" font-size="${ctaSize}" fill="#FFFFFF" text-anchor="middle">${esc(config.cta)}</text>`;
+    const ctaBannerH = Math.round(ref * 0.07);
+    const ctaFontSize = Math.round(ref * 0.028);
+    const ctaY = h - ctaBannerH;
+    // Yellow banner for light/gradient, brand color for dark/bold
+    const ctaBg = (isDark || config.style === "bold") ? `rgb(${r},${g},${b})` : "#FFE500";
+    const ctaTextColor = (isDark || config.style === "bold") ? "#FFFFFF" : "#1a1a2e";
+    ctaSvg = `<rect x="0" y="${ctaY}" width="${w}" height="${ctaBannerH}" fill="${ctaBg}"/>
+      <text x="${w / 2}" y="${ctaY + ctaBannerH / 2 + ctaFontSize * 0.35}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="900" font-size="${ctaFontSize}" fill="${ctaTextColor}" text-anchor="middle">${esc(config.cta)}</text>`;
   }
 
   // Brand badge — bottom right
