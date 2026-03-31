@@ -142,46 +142,60 @@ function buildBgSvg(w: number, h: number, r: number, g: number, b: number, style
 function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: number, b: number): string {
   const isLandscape = w > h;
   const ref = Math.min(w, h);
-  const pad = Math.round(ref * 0.07);
+  const pad = Math.round(ref * 0.06);
   const isDark = config.style === "dark" || config.style === "bold";
 
-  const baseHeadSize = Math.round(ref * (isLandscape ? 0.11 : 0.075));
-  const subSize = Math.round(ref * (isLandscape ? 0.045 : 0.03));
-  const badgeSize = Math.round(ref * 0.022);
+  // Bigger text to fill more of the card
+  const baseHeadSize = Math.round(ref * (isLandscape ? 0.12 : 0.09));
+  const subSize = Math.round(ref * (isLandscape ? 0.05 : 0.038));
+  const badgeSize = Math.round(ref * 0.024);
 
   const textColor = isDark ? "#FFFFFF" : "#1a1a2e";
   const subColor = isDark ? "rgba(255,255,255,0.7)" : "rgba(26,26,46,0.5)";
   const maxTextW = w - pad * 2;
 
-  // Reserve bottom space for CTA banner
-  const ctaBannerH = config.cta ? Math.round(ref * 0.065) : 0;
-  const maxY = h - ctaBannerH - pad; // text must stay above this
+  // CTA banner at the very bottom
+  const ctaBannerH = config.cta ? Math.round(ref * 0.08) : 0;
 
-  // ── Top: banner OR badge (not both) ──
+  // ── Calculate total content height first, then vertically center ──
+  const { size: headSize, lines: headLines } = fitHeadline(config.headline, baseHeadSize, maxTextW, 3);
+  const lineH = headSize * 1.2;
+  const headBlockH = headLines.length * lineH;
+
+  const subLines = config.subheadline ? wrapText(config.subheadline, subSize, maxTextW).slice(0, 2) : [];
+  const subBlockH = subLines.length > 0 ? subLines.length * (subSize * 1.5) + ref * 0.02 : 0;
+
+  const badgeH = config.badge ? badgeSize * 2.2 + ref * 0.015 : 0;
+  const bannerH = config.topBanner ? Math.round(ref * 0.07) : 0;
+
+  const totalContentH = badgeH + headBlockH + subBlockH;
+  const availableH = h - bannerH - ctaBannerH - pad * 2;
+
+  // Vertically center the text block
+  let y = bannerH + Math.max(pad, Math.round((availableH - totalContentH) / 2.5));
+
+  // ── Top banner (full width, pinned to top) ──
   let topSvg = "";
-  let y = pad;
-
   if (config.topBanner) {
-    const bannerH = Math.round(ref * 0.065);
-    const bannerFs = Math.round(ref * 0.026);
+    const bannerFs = Math.round(ref * 0.028);
     topSvg = `<rect x="0" y="0" width="${w}" height="${bannerH}" fill="#E53E3E"/>
       <text x="${w / 2}" y="${bannerH / 2 + bannerFs * 0.35}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="900" font-size="${bannerFs}" fill="#FFFFFF" text-anchor="middle">${esc(config.topBanner)}</text>`;
-    y = bannerH + ref * 0.01;
-  } else if (config.badge) {
-    const bSize = Math.round(ref * 0.022);
+  }
+
+  // ── Badge ──
+  let badgeSvg = "";
+  if (config.badge && !config.topBanner) {
+    const bSize = badgeSize;
     const bPad = bSize * 0.6;
     const bW = config.badge.length * bSize * 0.8 + bPad * 2;
     const bH = bSize * 2;
-    topSvg = `<rect x="${pad}" y="${y}" width="${bW}" height="${bH}" rx="${bH / 2}" fill="rgb(${r},${g},${b})"/>
+    badgeSvg = `<rect x="${pad}" y="${y}" width="${bW}" height="${bH}" rx="${bH / 2}" fill="rgb(${r},${g},${b})"/>
       <text x="${pad + bPad}" y="${y + bH / 2 + bSize * 0.35}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="700" font-size="${bSize}" fill="#FFFFFF">${esc(config.badge)}</text>`;
-    y += bH + ref * 0.012;
+    y += bH + ref * 0.015;
   }
 
-  // ── Headline (auto-shrink, max 3 lines) ──
-  const { size: headSize, lines: headLines } = fitHeadline(config.headline, baseHeadSize, maxTextW, 3);
-  const lineH = headSize * 1.15;
+  // ── Headline (vertically centered) ──
   const highlights = config.highlightWords || [];
-
   const headSvg = headLines.map((line, i) => {
     const ly = y + headSize + i * lineH;
     let hlSvg = "";
@@ -198,22 +212,20 @@ function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: nu
     }
     return `${hlSvg}<text x="${pad}" y="${ly}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="900" font-size="${headSize}" fill="${textColor}">${esc(line)}</text>`;
   }).join("");
-  y += headLines.length * lineH + ref * 0.015;
+  y += headBlockH + ref * 0.02;
 
-  // ── Subheadline (only if space available, max 2 lines) ──
+  // ── Subheadline ──
   let subSvg = "";
-  if (config.subheadline && y < maxY - ref * 0.1) {
-    const subLines = wrapText(config.subheadline, subSize, maxTextW);
-    subSvg = subLines.slice(0, 2).map((line, i) => {
-      return `<text x="${pad}" y="${y + subSize + i * (subSize * 1.4)}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="500" font-size="${subSize}" fill="${subColor}">${esc(line)}</text>`;
+  if (subLines.length > 0) {
+    subSvg = subLines.map((line, i) => {
+      return `<text x="${pad}" y="${y + subSize + i * (subSize * 1.5)}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="500" font-size="${subSize}" fill="${subColor}">${esc(line)}</text>`;
     }).join("");
-    y += subLines.slice(0, 2).length * (subSize * 1.4);
   }
 
-  // ── CTA bottom banner ──
+  // ── CTA (pinned to bottom, full width) ──
   let ctaSvg = "";
   if (config.cta) {
-    const ctaFs = Math.round(ref * 0.025);
+    const ctaFs = Math.round(ref * 0.028);
     const ctaY = h - ctaBannerH;
     const ctaBg = (isDark || config.style === "bold") ? `rgb(${r},${g},${b})` : "#FFE500";
     const ctaFill = (isDark || config.style === "bold") ? "#FFFFFF" : "#1a1a2e";
@@ -221,13 +233,13 @@ function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: nu
       <text x="${w / 2}" y="${ctaY + ctaBannerH / 2 + ctaFs * 0.35}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="800" font-size="${ctaFs}" fill="${ctaFill}" text-anchor="middle">${esc(config.cta)}</text>`;
   }
 
-  // ── Brand (above CTA banner, not overlapping) ──
+  // ── Brand (just above CTA) ──
   const brandFs = badgeSize;
-  const brandY = config.cta ? h - ctaBannerH - badgeSize * 2.5 : h - pad - badgeSize * 2;
-  const brandSvg = `<text x="${w - pad}" y="${brandY + brandFs}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="600" font-size="${brandFs}" fill="${isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.25)"}" text-anchor="end">${esc(config.productName)}</text>`;
+  const brandY = config.cta ? h - ctaBannerH - brandFs * 2 : h - pad - brandFs;
+  const brandSvg = `<text x="${w - pad}" y="${brandY}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="600" font-size="${brandFs}" fill="${isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.2)"}" text-anchor="end">${esc(config.productName)}</text>`;
 
   return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
-    ${topSvg}${headSvg}${subSvg}${ctaSvg}${brandSvg}
+    ${topSvg}${badgeSvg}${headSvg}${subSvg}${ctaSvg}${brandSvg}
   </svg>`;
 }
 
