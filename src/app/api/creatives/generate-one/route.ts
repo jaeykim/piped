@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { generateImage } from "@/lib/services/image-generator";
-import { generateGraphicCard, generateCardWithImage } from "@/lib/services/card-generator";
+import { generateGraphicCard, generateCardWithImage, generateCardOnImage } from "@/lib/services/card-generator";
 import { selectCopyTrio } from "@/lib/services/copy-generator";
 import { requireCredits, deductCredits } from "@/lib/services/credits";
 import { FieldValue } from "firebase-admin/firestore";
@@ -163,23 +163,7 @@ export async function POST(request: NextRequest) {
       };
       const cardStyle = styleMap[concept] || "gradient";
 
-      // ZET-style top banner for high-urgency/attention concepts
-      const topBannerMap: Record<string, string> = {
-        "urgency": "지금 안 보면 놓칩니다",
-        "offer": "기간 한정 특가",
-        "pain-point": "이 고민, 해결됩니다",
-        "before-after": "사용 전후 비교",
-        "question": "잠깐, 이거 알고 계셨나요?",
-      };
-      let topBanner = topBannerMap[concept];
-
-      // Override topBanner with primary appeal point if short enough
-      if (appealPoints?.length) {
-        const primaryAp = appealPoints.find((a: { role: string; text: string }) => a.role === "primary");
-        if (primaryAp?.text && primaryAp.text.length <= 20) {
-          topBanner = primaryAp.text;
-        }
-      }
+      // No top banner — keep the design clean. The headline IS the hook.
 
       // Auto-detect highlight words (numbers, product name, key terms)
       const headlineText = copyTrio.headline || finalOverlay;
@@ -211,7 +195,6 @@ export async function POST(request: NextRequest) {
         subheadline: copyTrio.subheadline,
         cta: copyTrio.cta || "자세히 보기 →",
         badge: autoBadge,
-        topBanner,
         productName: analysis.productName,
         brandColor: analysis.brandColors[0] || "#4F46E5",
         size,
@@ -257,57 +240,36 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Try to get an image for the card (screenshot or AI-generated)
+        // Try to get an image for full-bleed background
         let imageBuffer: Buffer | null = screenshotBuffer;
 
         // If no screenshot, generate a background image with Gemini
         if (!imageBuffer) {
           try {
-            const bgPrompt = `A clean, professional background image for a ${analysis.industry} advertisement about ${analysis.productName}. Show relevant visual elements: ${
+            const bgPrompt = `A beautiful, professional photo for a ${analysis.industry} advertisement. ${
               analysis.industry.includes("tech") || analysis.industry.includes("SaaS") || analysis.industry.includes("마케팅")
-                ? "a laptop screen with a modern dashboard, workspace setup, clean desk"
+                ? "A person working on a laptop in a bright modern office, warm lighting, lifestyle feel"
                 : analysis.industry.includes("뷰티") || analysis.industry.includes("beauty")
-                ? "skincare products arranged beautifully, soft lighting, clean composition"
+                ? "Beautiful skincare products on a clean surface, soft natural lighting, premium feel"
                 : analysis.industry.includes("음식") || analysis.industry.includes("food")
-                ? "appetizing food beautifully plated, warm lighting"
-                : `professional ${analysis.industry} scene with relevant objects`
-            }. Fill the entire frame. Bright, warm, inviting. Premium Korean ad quality. ABSOLUTELY NO TEXT, WORDS, or LETTERS.`;
+                ? "Appetizing food beautifully plated, close-up, warm natural lighting"
+                : `A professional, inviting scene related to ${analysis.industry}`
+            }. Fill the entire frame edge-to-edge. Bright, warm, high quality. Korean Instagram ad aesthetic. ABSOLUTELY NO TEXT or LETTERS of any kind.`;
             const bgResponse = await ai.models.generateImages({
               model: "imagen-4.0-generate-001",
               prompt: bgPrompt,
               config: { numberOfImages: 1, aspectRatio: "1:1" },
             });
             const bgImg = bgResponse.generatedImages?.[0]?.image?.imageBytes;
-            if (bgImg) {
-              imageBuffer = Buffer.from(bgImg, "base64");
-            }
+            if (bgImg) imageBuffer = Buffer.from(bgImg, "base64");
           } catch (e) {
             console.error("BG image generation failed:", e);
           }
         }
 
         if (imageBuffer) {
-          // Place image in the middle-bottom area of the card
-          const imgW = Math.round(cw * 0.9);
-          const imgH = Math.round(ch * 0.5);
-          const imgX = Math.round((cw - imgW) / 2);
-          const imgY = Math.round(ch * 0.4);
-
-          const resized = await sharp(imageBuffer)
-            .resize(imgW, imgH, { fit: "cover" })
-            .png()
-            .toBuffer();
-
-          // Add rounded corners
-          const maskSvg = `<svg width="${imgW}" height="${imgH}"><rect width="${imgW}" height="${imgH}" rx="12" fill="white"/></svg>`;
-          const rounded = await sharp(resized)
-            .composite([{ input: Buffer.from(maskSvg), blend: "dest-in" }])
-            .png()
-            .toBuffer();
-
-          const composited = await generateCardWithImage(cardConfig, rounded, {
-            top: imgY, left: imgX, width: imgW, height: imgH,
-          });
+          // FULL-BLEED: image fills entire card, gradient overlay + text on top
+          const composited = await generateCardOnImage(cardConfig, imageBuffer);
           cardData = composited.data;
         } else {
           cardData = (await generateGraphicCard(cardConfig)).data;

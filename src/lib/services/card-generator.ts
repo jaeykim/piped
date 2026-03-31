@@ -300,3 +300,49 @@ export async function generateCardWithImage(
 
   return { data: result.toString("base64"), mimeType: "image/png" };
 }
+
+/** Generate card with FULL-BLEED image background + gradient overlay + text */
+export async function generateCardOnImage(
+  config: CardConfig,
+  imageBuffer: Buffer,
+): Promise<{ data: string; mimeType: string }> {
+  const [w, h] = config.size.split("x").map(Number);
+  const { r, g, b } = hexToRgb(config.brandColor);
+
+  // Force dark style for text readability on photo background
+  const darkConfig = { ...config, style: "dark" as const };
+  const textBuffer = await generateCardTextOverlay(darkConfig);
+
+  // Resize image to fill the entire card
+  const bgImage = await sharp(imageBuffer)
+    .resize(w, h, { fit: "cover" })
+    .png()
+    .toBuffer();
+
+  // Gradient overlay: dark at top (for headline), dark at bottom (for CTA), lighter in middle
+  const gradientSvg = `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="topG" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="rgba(0,0,0,0.7)"/>
+        <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+      </linearGradient>
+      <linearGradient id="botG" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="rgba(0,0,0,0)"/>
+        <stop offset="100%" stop-color="rgba(${r},${g},${b},0.85)"/>
+      </linearGradient>
+    </defs>
+    <rect width="${w}" height="${Math.round(h * 0.5)}" fill="url(#topG)"/>
+    <rect y="${Math.round(h * 0.55)}" width="${w}" height="${Math.round(h * 0.45)}" fill="url(#botG)"/>
+  </svg>`;
+  const gradientBuffer = await sharp(Buffer.from(gradientSvg)).png().toBuffer();
+
+  const result = await sharp(bgImage)
+    .composite([
+      { input: gradientBuffer, top: 0, left: 0 },
+      { input: textBuffer, top: 0, left: 0 },
+    ])
+    .png()
+    .toBuffer();
+
+  return { data: result.toString("base64"), mimeType: "image/png" };
+}
