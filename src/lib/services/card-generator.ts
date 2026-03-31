@@ -95,52 +95,47 @@ function fitHeadline(text: string, baseSize: number, maxW: number, maxLines: num
   return { size, lines };
 }
 
-function buildBgSvg(w: number, h: number, r: number, g: number, b: number, style: string, isPortrait: boolean): string {
-  const isDark = style === "dark";
+function buildBgSvg(w: number, h: number, r: number, g: number, b: number, style: string, _isPortrait: boolean): string {
+  // Fill the entire frame — no empty space
+  const l = (amt: number) => lighten(r, g, b, amt);
   let bg = "";
+
   if (style === "dark") {
     bg = `<rect width="${w}" height="${h}" fill="#1a1a2e"/>
-      <rect width="${w}" height="${h}" fill="url(#bgGrad)" opacity="0.6"/>
-      <circle cx="${w * 0.92}" cy="${h * 0.12}" r="${w * 0.2}" fill="rgb(${r},${g},${b})" opacity="0.18"/>
-      <circle cx="${w * 0.85}" cy="${h * 0.75}" r="${w * 0.25}" fill="rgb(${r},${g},${b})" opacity="0.08"/>
-      <circle cx="${w * 0.05}" cy="${h * 0.85}" r="${w * 0.12}" fill="rgb(${r},${g},${b})" opacity="0.1"/>`;
+      <rect width="${w}" height="${h}" fill="url(#bgGrad)" opacity="0.5"/>
+      <circle cx="${w * 0.85}" cy="${h * 0.2}" r="${w * 0.35}" fill="rgb(${r},${g},${b})" opacity="0.15"/>
+      <circle cx="${w * 0.15}" cy="${h * 0.8}" r="${w * 0.3}" fill="rgb(${r},${g},${b})" opacity="0.1"/>
+      <rect x="0" y="${h * 0.6}" width="${w}" height="${h * 0.4}" fill="rgb(${r},${g},${b})" opacity="0.08"/>`;
   } else if (style === "gradient") {
-    bg = `<rect width="${w}" height="${h}" fill="${lighten(r, g, b, 0.82)}"/>
-      <rect width="${w}" height="${h}" fill="url(#bgGrad)" opacity="0.18"/>
-      <circle cx="${w * 0.88}" cy="${h * 0.75}" r="${w * 0.22}" fill="rgb(${r},${g},${b})" opacity="0.1"/>`;
+    bg = `<rect width="${w}" height="${h}" fill="${l(0.85)}"/>
+      <rect width="${w}" height="${h}" fill="url(#bgGrad)" opacity="0.15"/>
+      <circle cx="${w * 0.8}" cy="${h * 0.3}" r="${w * 0.4}" fill="rgb(${r},${g},${b})" opacity="0.08"/>
+      <circle cx="${w * 0.2}" cy="${h * 0.7}" r="${w * 0.35}" fill="rgb(${r},${g},${b})" opacity="0.06"/>
+      <rect x="0" y="${h * 0.65}" width="${w}" height="${h * 0.35}" fill="rgb(${r},${g},${b})" opacity="0.05" rx="${w * 0.02}"/>`;
   } else if (style === "bold") {
-    // ZET-style bold: strong brand color background
     bg = `<rect width="${w}" height="${h}" fill="rgb(${r},${g},${b})"/>
       <rect width="${w}" height="${h}" fill="url(#bgGrad)" opacity="0.3"/>
-      <circle cx="${w * 0.85}" cy="${h * 0.8}" r="${w * 0.25}" fill="rgba(255,255,255,0.08)"/>
-      <circle cx="${w * 0.1}" cy="${h * 0.15}" r="${w * 0.15}" fill="rgba(255,255,255,0.05)"/>`;
+      <circle cx="${w * 0.8}" cy="${h * 0.25}" r="${w * 0.35}" fill="rgba(255,255,255,0.06)"/>
+      <circle cx="${w * 0.2}" cy="${h * 0.75}" r="${w * 0.3}" fill="rgba(0,0,0,0.08)"/>
+      <rect x="0" y="${h * 0.7}" width="${w}" height="${h * 0.3}" fill="rgba(0,0,0,0.1)"/>`;
   } else if (style === "review") {
-    // ZET-style review/testimonial: warm cream background
     bg = `<rect width="${w}" height="${h}" fill="#FFF9F0"/>
-      <rect width="${w}" height="${h}" fill="url(#bgGrad)" opacity="0.05"/>
-      <circle cx="${w * 0.9}" cy="${h * 0.85}" r="${w * 0.18}" fill="rgb(${r},${g},${b})" opacity="0.06"/>`;
+      <circle cx="${w * 0.85}" cy="${h * 0.25}" r="${w * 0.3}" fill="rgb(${r},${g},${b})" opacity="0.05"/>
+      <circle cx="${w * 0.15}" cy="${h * 0.75}" r="${w * 0.25}" fill="rgb(${r},${g},${b})" opacity="0.04"/>
+      <rect x="0" y="${h * 0.65}" width="${w}" height="${h * 0.35}" fill="rgb(${r},${g},${b})" opacity="0.04"/>`;
   } else {
     bg = `<rect width="${w}" height="${h}" fill="#F5F5F5"/>
-      <rect width="${w}" height="${h}" fill="url(#bgGrad)" opacity="0.1"/>
-      <circle cx="${w * 0.88}" cy="${h * 0.75}" r="${w * 0.2}" fill="rgb(${r},${g},${b})" opacity="0.07"/>`;
+      <rect width="${w}" height="${h}" fill="url(#bgGrad)" opacity="0.08"/>
+      <circle cx="${w * 0.8}" cy="${h * 0.3}" r="${w * 0.35}" fill="rgb(${r},${g},${b})" opacity="0.06"/>
+      <rect x="0" y="${h * 0.65}" width="${w}" height="${h * 0.35}" fill="rgb(${r},${g},${b})" opacity="0.04"/>`;
   }
-
-  let deco = "";
-  if (isPortrait) {
-    const midY = h * 0.5;
-    deco = `<circle cx="${w * 0.8}" cy="${midY + h * 0.15}" r="${w * 0.2}" fill="rgb(${r},${g},${b})" opacity="${isDark ? 0.12 : 0.06}"/>
-      <circle cx="${w * 0.15}" cy="${midY + h * 0.3}" r="${w * 0.1}" fill="rgb(${r},${g},${b})" opacity="${isDark ? 0.08 : 0.04}"/>
-      <circle cx="${w * 0.5}" cy="${h * 0.85}" r="${w * 0.15}" fill="rgb(${r},${g},${b})" opacity="${isDark ? 0.1 : 0.05}"/>`;
-  }
-
-  const bottomBar = `<rect x="0" y="${h - Math.round(w * 0.03)}" width="${w}" height="${Math.round(w * 0.03)}" fill="rgb(${r},${g},${b})" opacity="${isDark ? 0.3 : 0.12}"/>`;
 
   return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
     <defs><linearGradient id="bgGrad" x1="0" y1="0" x2="${w}" y2="${h}">
       <stop offset="0%" stop-color="rgb(${r},${g},${b})"/>
       <stop offset="100%" stop-color="rgb(${Math.max(0, r - 30)},${Math.max(0, g - 30)},${Math.max(0, b - 30)})"/>
     </linearGradient></defs>
-    ${bg}${deco}${bottomBar}
+    ${bg}
   </svg>`;
 }
 

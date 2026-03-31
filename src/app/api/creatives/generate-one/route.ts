@@ -258,12 +258,11 @@ export async function POST(request: NextRequest) {
         }
 
         if (screenshotBuffer) {
-          // ZET-style: prominent screenshot in the middle section of the card
-          const isSquare = Math.abs(cw - ch) < 100;
-          const mockW = Math.round(cw * (isSquare ? 0.5 : 0.45));
-          const mockH = Math.round(mockW * 0.65);
-          const mockX = cw - mockW - Math.round(cw * 0.04);
-          const mockY = Math.round(ch * 0.35); // middle area, not bottom corner
+          // Screenshot fills the lower 60% of the card
+          const mockW = Math.round(cw * 0.85);
+          const mockH = Math.round(ch * 0.5);
+          const mockX = Math.round((cw - mockW) / 2);
+          const mockY = Math.round(ch * 0.4);
 
           // Resize screenshot to fit mockup, add rounded corners via SVG mask
           const ssResized = await sharp(screenshotBuffer)
