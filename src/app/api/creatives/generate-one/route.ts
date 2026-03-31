@@ -110,8 +110,8 @@ export async function POST(request: NextRequest) {
     const analysis = analysisSnap.data() as SiteAnalysis;
     const websiteUrl = projectSnap.data()?.url;
 
-    // Smart Copy Trio: auto-select best headline + subheadline + CTA
-    let copyTrio = { headline: "", subheadline: "", cta: "" };
+    // Smart Copy Trio: auto-select best headline + subheadline + CTA (with timeout)
+    let copyTrio = { headline: analysis.valueProposition || analysis.productName, subheadline: "", cta: "자세히 보기 →" };
     try {
       const copySnap = await adminDb
         .collection(`projects/${projectId}/copyVariants`)
@@ -121,16 +121,21 @@ export async function POST(request: NextRequest) {
           type: d.data().type as string,
           content: (d.data().editedContent || d.data().content) as string,
         }));
-        copyTrio = await selectCopyTrio(variants, concept, language);
+        // Race with 15s timeout to prevent hanging
+        const trioPromise = selectCopyTrio(variants, concept, language);
+        const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Copy trio timeout")), 15000));
+        copyTrio = await Promise.race([trioPromise, timeoutPromise]);
       }
     } catch (e) {
-      console.error("Smart copy trio failed:", e);
+      console.error("Smart copy trio failed (using fallback):", e);
     }
 
     // Override copy trio with user-selected appeal points / CTA
     if (appealPoints?.length) {
-      if (appealPoints[0]) copyTrio.headline = appealPoints[0];
-      if (appealPoints[1]) copyTrio.subheadline = appealPoints[1];
+      const primary = appealPoints.find((a: { role: string }) => a.role === "primary");
+      const secondary = appealPoints.find((a: { role: string }) => a.role === "secondary");
+      if (primary?.text) copyTrio.headline = primary.text;
+      if (secondary?.text) copyTrio.subheadline = secondary.text;
     }
     if (ctaText) {
       copyTrio.cta = ctaText;
@@ -168,11 +173,11 @@ export async function POST(request: NextRequest) {
       };
       let topBanner = topBannerMap[concept];
 
-      // Override topBanner/headline with appeal points if provided
+      // Override topBanner with primary appeal point if short enough
       if (appealPoints?.length) {
-        // First appeal point as topBanner if it's short/hook-like (≤20 chars)
-        if (appealPoints[0] && appealPoints[0].length <= 20) {
-          topBanner = appealPoints[0];
+        const primaryAp = appealPoints.find((a: { role: string; text: string }) => a.role === "primary");
+        if (primaryAp?.text && primaryAp.text.length <= 20) {
+          topBanner = primaryAp.text;
         }
       }
 
