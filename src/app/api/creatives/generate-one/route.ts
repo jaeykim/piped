@@ -257,36 +257,56 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        if (screenshotBuffer) {
-          // Screenshot fills the lower 60% of the card
-          const mockW = Math.round(cw * 0.85);
-          const mockH = Math.round(ch * 0.5);
-          const mockX = Math.round((cw - mockW) / 2);
-          const mockY = Math.round(ch * 0.4);
+        // Try to get an image for the card (screenshot or AI-generated)
+        let imageBuffer: Buffer | null = screenshotBuffer;
 
-          // Resize screenshot to fit mockup, add rounded corners via SVG mask
-          const ssResized = await sharp(screenshotBuffer)
-            .resize(mockW - 12, mockH - 12, { fit: "cover" })
+        // If no screenshot, generate a background image with Gemini
+        if (!imageBuffer) {
+          try {
+            const bgPrompt = `A clean, professional background image for a ${analysis.industry} advertisement about ${analysis.productName}. Show relevant visual elements: ${
+              analysis.industry.includes("tech") || analysis.industry.includes("SaaS") || analysis.industry.includes("마케팅")
+                ? "a laptop screen with a modern dashboard, workspace setup, clean desk"
+                : analysis.industry.includes("뷰티") || analysis.industry.includes("beauty")
+                ? "skincare products arranged beautifully, soft lighting, clean composition"
+                : analysis.industry.includes("음식") || analysis.industry.includes("food")
+                ? "appetizing food beautifully plated, warm lighting"
+                : `professional ${analysis.industry} scene with relevant objects`
+            }. Fill the entire frame. Bright, warm, inviting. Premium Korean ad quality. ABSOLUTELY NO TEXT, WORDS, or LETTERS.`;
+            const bgResponse = await ai.models.generateImages({
+              model: "imagen-4.0-generate-001",
+              prompt: bgPrompt,
+              config: { numberOfImages: 1, aspectRatio: "1:1" },
+            });
+            const bgImg = bgResponse.generatedImages?.[0]?.image?.imageBytes;
+            if (bgImg) {
+              imageBuffer = Buffer.from(bgImg, "base64");
+            }
+          } catch (e) {
+            console.error("BG image generation failed:", e);
+          }
+        }
+
+        if (imageBuffer) {
+          // Place image in the middle-bottom area of the card
+          const imgW = Math.round(cw * 0.9);
+          const imgH = Math.round(ch * 0.5);
+          const imgX = Math.round((cw - imgW) / 2);
+          const imgY = Math.round(ch * 0.4);
+
+          const resized = await sharp(imageBuffer)
+            .resize(imgW, imgH, { fit: "cover" })
             .png()
             .toBuffer();
 
-          // Create frame with rounded corners + shadow
-          const frameSvg = `<svg width="${mockW}" height="${mockH}" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <filter id="sh" x="-8%" y="-8%" width="120%" height="120%">
-                <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="rgba(0,0,0,0.2)"/>
-              </filter>
-            </defs>
-            <rect x="2" y="2" width="${mockW - 4}" height="${mockH - 4}" rx="8" fill="white" filter="url(#sh)"/>
-          </svg>`;
-          const frame = await sharp(Buffer.from(frameSvg)).png().toBuffer();
-          const mockup = await sharp(frame)
-            .composite([{ input: ssResized, top: 6, left: 6 }])
+          // Add rounded corners
+          const maskSvg = `<svg width="${imgW}" height="${imgH}"><rect width="${imgW}" height="${imgH}" rx="12" fill="white"/></svg>`;
+          const rounded = await sharp(resized)
+            .composite([{ input: Buffer.from(maskSvg), blend: "dest-in" }])
             .png()
             .toBuffer();
 
-          const composited = await generateCardWithImage(cardConfig, mockup, {
-            top: mockY, left: mockX, width: mockW, height: mockH,
+          const composited = await generateCardWithImage(cardConfig, rounded, {
+            top: imgY, left: imgX, width: imgW, height: imgH,
           });
           cardData = composited.data;
         } else {
