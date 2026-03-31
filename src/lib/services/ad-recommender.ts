@@ -17,7 +17,10 @@ export async function recommendAdStrategy(
   const msg = await anthropic.messages.create({
     model: "claude-sonnet-4-20250514",
     max_tokens: 600,
-    system: `You analyze products and recommend Meta ad creative strategies. Return ONLY valid JSON array.`,
+    system: `You are a Meta ad strategist who understands impulse-purchase psychology.
+Key principle: Meta ads work on IMPULSE (충동구매), not search intent. Content is 80% of performance.
+The goal is to stop the scroll in 0.5 seconds by targeting the customer's EXACT SITUATION.
+Use customer's language, not supplier's language. Return ONLY valid JSON array.`,
     messages: [{
       role: "user",
       content: `Analyze this product and recommend the TOP 3 ad creative combinations.

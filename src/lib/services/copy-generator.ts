@@ -126,21 +126,33 @@ export async function generateAppealPoints(
 ): Promise<AppealPoint[]> {
   const lang = language || "Korean";
   const res = await callClaude(
-    `You are a top-tier performance marketer who writes ZET-style appeal points (소구점) for ads.
-Each appeal point is a short, punchy statement that captures ONE reason why the target audience should care about the product.
+    `You are a top-tier Korean Meta/Instagram performance marketer.
+You create appeal points (소구점) that stop the scroll in 0.5 seconds.
+
+CORE PRINCIPLE (from "메타 퍼포먼스 광고 A to Z"):
+- Meta ads are IMPULSE purchases, not search-intent. You must create the impulse.
+- Use CUSTOMER'S LANGUAGE, not the supplier's language.
+  BAD (supplier): "검색동선과 전환동선 최적화"
+  GOOD (customer): "신점이 무서워서 도전해보지 못하셨던 분들!"
+- The first line must make the target think "이거 내 얘기네" (this is about ME)
+- Main copy = problem/target situation → Sub copy = solution/result (causal relationship)
+- Include SPECIFIC situation the target is in, not just demographics
 
 Rules:
 - Generate 3-5 appeal points
-- Each must be 1 short sentence, MAX 15 words
+- Each must be MAX 15 words, in CUSTOMER'S language (not technical/marketing jargon)
 - Types:
-  - "hook": provocative attention grabber that stops the scroll. Use patterns like:
-    * "[직업]이 나 몰래 쓰던 [제품]" (e.g. "열 살 원장님이 나 몰래 쓰던 예약 솔루션")
-    * "아직도 [고통]하고 계세요?" (e.g. "아직도 수동으로 마케팅하고 계세요?")
-    * "[놀라운 사실]인 줄 알았던 [제품명]" (e.g. "빼빠라인인줄 알았던 친구가 나 몰래 먹었던 그 제품")
-  - "benefit": clear outcome the user gets with SPECIFIC NUMBERS (e.g. "매일 3시간 절약, 매출은 2배", "하루 833원으로 해결")
-  - "proof": social proof or concrete numbers (e.g. "이미 10,000개 팀이 선택", "만족도 4.9")
+  - "hook": stops the scroll by describing the TARGET'S EXACT SITUATION. Patterns:
+    * "[상황에 처한 타겟]이 나 몰래 쓰던 [제품]" (targets specific person + secret)
+    * "아직도 [타겟의 고통스러운 현재 상황]하고 계세요?" (calls out their pain)
+    * "[놀라운 결과]인 줄 알았는데 [제품]이었습니다" (curiosity gap)
+    * "[구체적 숫자]만에 [결과]" (e.g. "61세도 100만원씩 벌 수 있는 AI 부업")
+  - "benefit": the RESULT in customer's words with SPECIFIC NUMBERS
+    * NOT features → OUTCOMES ("하루 833원으로 해결", "매출 2배, 시간은 절반")
+  - "proof": concrete evidence that creates trust
+    * Real numbers, testimonial-style, certificate/award references
 - Include at least 1 hook and 1 benefit
-- Be specific to THIS product — no generic filler
+- Be hyper-specific to THIS product and its target audience
 - Write in ${lang}
 
 Return ONLY a JSON array:
@@ -192,21 +204,37 @@ The headline MUST reflect the primary appeal point's message. The subheadline ma
   if (headlines.length > 0 && descriptions.length > 0) {
     try {
       const res = await callClaude(
-        `You are a Korean performance marketing expert specializing in Meta/Instagram ads. Pick and ENHANCE the best headline + subheadline + CTA for the given concept. Return ONLY valid JSON.
+        `You are a Korean Meta/Instagram ad copy expert who understands impulse-purchase psychology.
 
-Rules for the headline (most important):
+CORE RULES (from "메타 퍼포먼스 광고 A to Z"):
+1. The headline must stop the scroll in 0.5 seconds
+2. Use CUSTOMER'S LANGUAGE — describe their situation, not your features
+3. Main (headline) and Sub (subheadline) must have a CAUSAL RELATIONSHIP:
+   - headline = problem/situation → subheadline = solution/result
+   - OR headline = result → subheadline = evidence/how
+4. The target must think "이거 내 얘기네" when they see the headline
+
+Rules for the headline:
 - MAX 3-5 words. This goes on an ad image.
-- Include a SPECIFIC NUMBER when possible (%, 원, 배, 명, 분, 시간)
-- For "urgency": add time pressure ("이번 주만", "선착순 100명")
-- For "question": make it provocative and curiosity-inducing
-- For "before-after": show the contrast ("하루 3시간? → 3분")
-- For "social-proof": lead with the number ("10,000+ 팀")
-- For "offer": lead with the discount/free ("지금 무료", "50% 할인")
-- For "comparison": name the old way vs new ("수동 vs AI")
-- For "story": use first-person voice ("월 매출 0원이었는데")
-- For "pain-point": start with the pain ("아직도 ~하세요?")
-- For "benefit-driven": state the result ("3분 만에 완성")
-DO NOT use full sentences. Short, punchy, hooking.`,
+- Describe the TARGET'S SITUATION, not the product's features
+- Include SPECIFIC NUMBER when possible (%, 원, 배, 명, 분)
+- BAD: "마케팅 자동화 플랫폼" (supplier language)
+- GOOD: "아직도 수동으로 광고 만드세요?" (customer's situation)
+- For "urgency": time pressure ("이번 주만", "선착순 100명")
+- For "question": provocative, targets exact pain
+- For "before-after": contrast ("하루 3시간? → 3분")
+- For "social-proof": lead with number ("10,000+ 팀이 선택한")
+- For "offer": discount/free first ("지금 무료", "50% 할인")
+- For "story": first-person ("월 매출 0원이었는데")
+- For "pain-point": call out their situation ("아직도 ~하세요?")
+- For "benefit-driven": state the result in their words ("3분 만에 완성")
+
+Rules for the subheadline:
+- Must COMPLETE the headline's logic (cause→effect or problem→solution)
+- More detail than headline but still concise (1 sentence)
+
+DO NOT use full sentences in headline. Short, punchy, hooking.
+Return ONLY valid JSON.`,
         `Pick the best combination for a "${concept}" ad concept${language ? ` in ${language}` : ""}.
 
 Available headlines: ${JSON.stringify(headlines)}
