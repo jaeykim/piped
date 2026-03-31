@@ -15,6 +15,7 @@ export interface ImageRequest {
   websiteUrl?: string;
   language?: string;
   country?: string;
+  styleRef?: string; // AD_STYLE_REFERENCES id
 }
 
 const sizeConfig: Record<CreativeSize, { aspectRatio: string }> = {
@@ -209,6 +210,22 @@ export async function generateImage(
     console.error("Claude failed:", e);
     hookText = userCopy;
     imagePrompt = getCompositionTemplate(request.concept, subject, analysis);
+  }
+
+  // Inject style reference if selected
+  if (request.styleRef) {
+    const { AD_STYLE_REFERENCES, buildStyleReferencePrompt } = await import("./style-references");
+    const style = AD_STYLE_REFERENCES.find((s) => s.id === request.styleRef);
+    if (style) {
+      const stylePrompt = buildStyleReferencePrompt(
+        style,
+        analysis.productName,
+        analysis.valueProposition,
+        analysis.industry,
+        analysis.brandColors,
+      );
+      imagePrompt = `${stylePrompt}\n\nAdditional creative direction: ${imagePrompt}`;
+    }
   }
 
   // Ensure no-text instruction

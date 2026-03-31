@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     const decoded = await adminAuth.verifyIdToken(token);
     const uid = decoded.uid;
 
-    const { projectId, size, platform, concept, subject, overlayText, userImage, language, country, appealPoints, ctaText } = await request.json();
+    const { projectId, size, platform, concept, subject, overlayText, userImage, language, country, appealPoints, ctaText, styleRef } = await request.json();
 
     // Check credits (graphic-card is cheaper than AI photo)
     const creditAction = subject === "graphic-card" ? "creative-graphic" : "creative-ai";
@@ -310,6 +310,7 @@ export async function POST(request: NextRequest) {
         websiteUrl,
         language,
         country,
+        styleRef,
       });
     }
 

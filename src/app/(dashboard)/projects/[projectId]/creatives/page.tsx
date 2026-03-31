@@ -41,6 +41,7 @@ import {
   type CreativeConcept,
   type CreativeSubject,
 } from "@/types/creative";
+import { AD_STYLE_REFERENCES } from "@/lib/services/style-references";
 import type { CopyVariant } from "@/types/copy";
 import { CreativeEditor, type CreativeEditorData } from "@/components/creative-editor";
 import { CreativePreview } from "@/components/creative-preview";
@@ -131,6 +132,7 @@ export default function CreativesPage() {
   const [selectedCountry, setSelectedCountry] = useState("KR");
   const [selectedConcept, setSelectedConcept] = useState<CreativeConcept | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<CreativeSubject>("graphic-card");
+  const [selectedStyle, setSelectedStyle] = useState<string | null>(null);
   const [selectedCopy, setSelectedCopy] = useState<string>("");
   const [uploadedImage, setUploadedImage] = useState<string | null>(null); // base64 data URL
   const [copyVariants, setCopyVariants] = useState<CopyVariant[]>([]);
@@ -280,6 +282,7 @@ export default function CreativesPage() {
           userImage: uploadedImage || undefined,
           appealPoints: appealPoints.filter((a) => a.role !== "none").map((a) => ({ text: a.text, role: a.role })),
           ctaText: customCta || undefined,
+          styleRef: selectedStyle || undefined,
           language: LANGUAGES.find((l) => l.code === selectedLanguage)?.label,
           country: COUNTRIES.find((c) => c.code === selectedCountry)?.label,
         }),
@@ -824,6 +827,36 @@ export default function CreativesPage() {
                 <div>
                   <p className="font-semibold text-gray-900">{s.name}</p>
                   <p className="text-xs text-gray-500">{s.description}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Style Reference */}
+        <div className="mt-8">
+          <h2 className="text-sm font-medium text-gray-700">{isKo ? "광고 스타일 참조" : "Ad Style Reference"}</h2>
+          <p className="mt-1 text-xs text-gray-400">{isKo ? "AI가 이 스타일을 참고하여 이미지를 생성합니다" : "AI will use this style as reference for image generation"}</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            {AD_STYLE_REFERENCES.map((style) => (
+              <button
+                key={style.id}
+                onClick={() => setSelectedStyle(selectedStyle === style.id ? null : style.id)}
+                className={`rounded-xl border-2 p-3 text-left transition-all ${
+                  selectedStyle === style.id
+                    ? "border-indigo-500 bg-indigo-50 ring-1 ring-indigo-200"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{style.emoji}</span>
+                  <p className="text-sm font-semibold text-gray-900">{isKo ? style.name : style.nameEn}</p>
+                </div>
+                <p className="mt-1 text-[10px] text-gray-500">{isKo ? style.description : style.descriptionEn}</p>
+                <div className="mt-2 flex gap-1">
+                  {[style.colors.background, style.colors.accent, style.colors.text].map((c, i) => (
+                    <div key={i} className="h-3 w-3 rounded-full border border-gray-200" style={{ backgroundColor: c }} />
+                  ))}
                 </div>
               </button>
             ))}
