@@ -57,36 +57,36 @@ function getCompositionTemplate(concept: CreativeConcept, subject: CreativeSubje
   const audience = analysis.targetAudience[0] || "professionals";
   const colors = analysis.brandColors.join(", ") || "#4F46E5, white";
 
-  // Subject-specific base scenes — MUST include product context
+  // Subject-specific base scenes — fill the frame, minimal empty space
   const subjectScenes: Record<CreativeSubject, string> = {
-    "graphic-card": `A visually rich graphic design composition for a ${industry} ad about "${product}". NOT a plain colored background — include relevant visual elements that represent the product/service: ${
+    "graphic-card": `A FULL-FRAME graphic design composition for a ${industry} ad about "${product}". The entire image must be FILLED with visual elements — no empty space, no plain backgrounds. Include: ${
       industry.includes("뷰티") || industry.includes("beauty") || industry.includes("cosmetic")
-        ? "cosmetic products, skincare bottles, beauty tools, flower petals, soft glowing skin texture"
+        ? "cosmetic products, skincare bottles arranged beautifully, flower petals scattered, soft glowing textures"
         : industry.includes("교육") || industry.includes("education") || industry.includes("learn")
-        ? "books, graduation caps, study elements, bright academic environment, learning icons"
+        ? "books stacked, study materials, bright academic icons, learning atmosphere"
         : industry.includes("음식") || industry.includes("food") || industry.includes("restaurant")
-        ? "appetizing food photography, fresh ingredients, warm plating, restaurant ambiance"
+        ? "appetizing food close-up filling the frame, fresh ingredients, warm lighting"
         : industry.includes("피트니스") || industry.includes("fitness") || industry.includes("health")
-        ? "workout equipment, healthy lifestyle elements, energy, vitality"
+        ? "workout equipment close-up, energy, vitality elements filling the frame"
         : industry.includes("tech") || industry.includes("SaaS") || industry.includes("software") || industry.includes("마케팅") || industry.includes("marketing")
-        ? "floating UI elements, dashboard fragments, data visualization shapes, modern tech iconography, app screens, digital workflow visuals"
+        ? "floating UI cards, dashboard fragments, data charts, app screens, digital elements filling every corner"
         : industry.includes("fashion") || industry.includes("패션")
-        ? "fabric textures, fashion accessories, stylish lifestyle elements, elegant composition"
-        : `relevant visual elements for ${industry}: product imagery, iconography, and contextual objects that represent ${product}`
-    }. Use ${colors} as the primary color palette. The composition should be VISUALLY INTERESTING — not an empty background. Place visual elements on the lower half or sides, leaving the upper portion slightly cleaner (with a subtle gradient overlay) for text that will be added separately. Bright, modern, eye-catching Korean social media ad style. No text, no words, no letters, no numbers on the image.`,
-    "product-ui": `A modern device (MacBook Pro 2024 or iPhone 15 Pro) displaying a realistic ${industry} interface for ${product}. The screen should show a SPECIFIC, relevant UI: ${
-      analysis.keyFeatures[0] ? `a screen related to "${analysis.keyFeatures[0]}"` : "a clean, data-rich dashboard"
-    }. Device at 10° tilt with realistic shadow. Background: bright gradient using ${colors}, with subtle ${industry}-related decorative elements around the device (floating icons, small UI fragments). The device takes up 40-50% of the frame. Bright, premium, inviting. No text, no words.`,
-    "person-product": `A ${audience} in their late 20s, beaming with a genuine smile, in a bright ${industry}-relevant environment. They're naturally interacting with ${
-      industry.includes("뷰티") || industry.includes("beauty") ? "beauty products, applying skincare, or showing glowing skin"
-        : industry.includes("food") || industry.includes("음식") ? "delicious food, cooking, or enjoying a meal"
-        : `a laptop or phone showing ${product}`
-    }. The person takes up 50-60% of the frame, positioned on one side with the ${industry} context visible. Shot on 85mm, f/2.8, warm natural light. Authentic, warm, high-energy Instagram ad feel. No text, no words.`,
+        ? "fabric textures filling the frame, fashion accessories, elegant close-up composition"
+        : `${industry} visual elements filling the entire frame: product imagery, objects representing ${product}`
+    }. Use ${colors} as palette. The ENTIRE frame must be filled — use layered elements, overlapping objects, depth. Think premium magazine ad layout. ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO NUMBERS, NO CHARACTERS of any language in the image.`,
+    "product-ui": `A modern device (MacBook Pro 2024 or iPhone 15 Pro) FILLING 70-80% of the frame, displaying a realistic ${industry} interface for ${product}. The screen shows: ${
+      analysis.keyFeatures[0] ? `UI related to "${analysis.keyFeatures[0]}"` : "a clean, data-rich dashboard"
+    }. Device slightly tilted (5°) with soft shadow. Background: solid ${colors} gradient, MINIMAL empty space around the device — the device should DOMINATE the composition. Premium, clean. ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS outside the device screen.`,
+    "person-product": `A ${audience} in their late 20s, genuine smile, in a ${industry}-relevant environment. Interacting with ${
+      industry.includes("뷰티") || industry.includes("beauty") ? "beauty products, applying skincare"
+        : industry.includes("food") || industry.includes("음식") ? "delicious food, enjoying a meal"
+        : `a laptop or phone`
+    }. Person FILLS 60-70% of the frame, slightly off-center. Shot on 85mm, f/2.8, warm natural light. Authentic Instagram lifestyle feel. CRITICAL: ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO NUMBERS, NO WATERMARKS, NO CHARACTERS of ANY language anywhere in the image. The image must be completely free of any written content.`,
     "animal-mascot": `The CUTEST ${["orange tabby cat with big round eyes", "fluffy golden retriever puppy", "smiling corgi with tongue out", "round-faced british shorthair"][Math.floor(Math.random() * 4)]} surrounded by ${industry}-related items (${
-      industry.includes("뷰티") || industry.includes("beauty") ? "tiny skincare bottles, flower petals, soft pink setting"
-        : industry.includes("tech") || industry.includes("SaaS") ? "a tiny laptop, colorful sticky notes, a mini keyboard"
-        : `miniature ${industry} props and items`
-    }). Bright, cheerful setting with ${colors} color accents. Eye-level, 85mm, f/2.8, pin-sharp focus on eyes, warm golden light. Irresistibly cute + contextually relevant. No text, no words.`,
+      industry.includes("뷰티") || industry.includes("beauty") ? "tiny skincare bottles, flower petals, pink setting"
+        : industry.includes("tech") || industry.includes("SaaS") ? "a tiny laptop, colorful sticky notes, mini keyboard"
+        : `miniature ${industry} props`
+    }). Animal FILLS 60% of frame. Bright, cheerful, ${colors} accents. Eye-level, 85mm, f/2.8, warm golden light. ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS in the image.`,
   };
 
   // Concept-specific mood — always BRIGHT AND HOOKING
@@ -228,10 +228,8 @@ export async function generateImage(
     }
   }
 
-  // Ensure no-text instruction
-  if (!imagePrompt.toLowerCase().includes("no text")) {
-    imagePrompt += " No text, words, letters, numbers, or watermarks in the image.";
-  }
+  // Enforce strict no-text instruction (Imagen tends to generate text)
+  imagePrompt += "\n\nCRITICAL REQUIREMENT: The generated image must contain ABSOLUTELY ZERO text, words, letters, numbers, characters, watermarks, logos with text, or any form of written content in ANY language (English, Korean, Chinese, Japanese, or any other). The image must be purely visual with no readable content whatsoever.";
 
   // Stage 2: Generate image
   const { aspectRatio } = sizeConfig[request.size];
