@@ -210,7 +210,8 @@ function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: nu
         hlSvg += `<rect x="${hlX - 4}" y="${ly - headSize * 0.85}" width="${hlW + 8}" height="${headSize * 1.1}" rx="4" fill="${hlColor}" opacity="${isDark ? 0.9 : 0.2}"/>`;
       }
     }
-    return `${hlSvg}<text x="${pad}" y="${ly}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="900" font-size="${headSize}" fill="${textColor}">${esc(line)}</text>`;
+    // Text with stroke outline for readability on any background
+    return `${hlSvg}<text x="${pad}" y="${ly}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="900" font-size="${headSize}" fill="${textColor}" stroke="${isDark ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.5)"}" stroke-width="${Math.round(headSize * 0.03)}" paint-order="stroke">${esc(line)}</text>`;
   }).join("");
   y += headBlockH + ref * 0.02;
 
@@ -218,7 +219,7 @@ function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: nu
   let subSvg = "";
   if (subLines.length > 0) {
     subSvg = subLines.map((line, i) => {
-      return `<text x="${pad}" y="${y + subSize + i * (subSize * 1.5)}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="500" font-size="${subSize}" fill="${subColor}">${esc(line)}</text>`;
+      return `<text x="${pad}" y="${y + subSize + i * (subSize * 1.5)}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="600" font-size="${subSize}" fill="${isDark ? "rgba(255,255,255,0.9)" : subColor}" stroke="${isDark ? "rgba(0,0,0,0.3)" : "none"}" stroke-width="${isDark ? Math.round(subSize * 0.03) : 0}" paint-order="stroke">${esc(line)}</text>`;
     }).join("");
   }
 
@@ -319,20 +320,22 @@ export async function generateCardOnImage(
     .png()
     .toBuffer();
 
-  // Gradient overlay: dark at top (for headline), dark at bottom (for CTA), lighter in middle
+  // Strong gradient overlay: dark at top (headline), brand color at bottom (CTA)
   const gradientSvg = `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <linearGradient id="topG" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="rgba(0,0,0,0.7)"/>
+        <stop offset="0%" stop-color="rgba(0,0,0,0.75)"/>
+        <stop offset="60%" stop-color="rgba(0,0,0,0.3)"/>
         <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
       </linearGradient>
       <linearGradient id="botG" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stop-color="rgba(0,0,0,0)"/>
-        <stop offset="100%" stop-color="rgba(${r},${g},${b},0.85)"/>
+        <stop offset="40%" stop-color="rgba(${r},${g},${b},0.5)"/>
+        <stop offset="100%" stop-color="rgba(${r},${g},${b},0.9)"/>
       </linearGradient>
     </defs>
-    <rect width="${w}" height="${Math.round(h * 0.5)}" fill="url(#topG)"/>
-    <rect y="${Math.round(h * 0.55)}" width="${w}" height="${Math.round(h * 0.45)}" fill="url(#botG)"/>
+    <rect width="${w}" height="${Math.round(h * 0.55)}" fill="url(#topG)"/>
+    <rect y="${Math.round(h * 0.5)}" width="${w}" height="${Math.round(h * 0.5)}" fill="url(#botG)"/>
   </svg>`;
   const gradientBuffer = await sharp(Buffer.from(gradientSvg)).png().toBuffer();
 

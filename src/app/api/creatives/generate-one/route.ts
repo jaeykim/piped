@@ -165,14 +165,13 @@ export async function POST(request: NextRequest) {
 
       // No top banner — keep the design clean. The headline IS the hook.
 
-      // Auto-detect highlight words (numbers, product name, key terms)
+      // Auto-detect highlight words — only highlight numbers with units (3+ chars)
       const headlineText = copyTrio.headline || finalOverlay;
       const highlightWords: string[] = [];
-      // Highlight numbers with units (e.g., "3분", "50%", "10,000+")
-      const numberMatches = headlineText.match(/[\d,]+[%배분초만원개+]*/g);
-      if (numberMatches) highlightWords.push(...numberMatches.slice(0, 2));
-      // Highlight product name if it appears
-      if (headlineText.includes(analysis.productName)) highlightWords.push(analysis.productName);
+      const numberMatches = headlineText.match(/\d[\d,]*\s*[%배분초만원개+]+/g);
+      if (numberMatches) {
+        highlightWords.push(...numberMatches.filter((m: string) => m.length >= 2).slice(0, 1));
+      }
 
       // Auto badge based on concept (ZET-style Korean ad patterns)
       const badgeMap: Record<string, string> = {
