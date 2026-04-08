@@ -123,8 +123,8 @@ export default function DashboardPage() {
                 </p>
                 <p className="mt-1 text-sm text-amber-800">
                   {isKo
-                    ? "Piped가 광고를 자동으로 운영하려면 메타 광고 계정 연결이 필요합니다."
-                    : "Connect your Meta ad account so Piped can run the optimization loop."}
+                    ? "Maktmakr가 광고를 자동으로 운영하려면 메타 광고 계정 연결이 필요합니다."
+                    : "Connect your Meta ad account so Maktmakr can run the optimization loop."}
                 </p>
                 <Link href="/settings">
                   <Button className="mt-4">

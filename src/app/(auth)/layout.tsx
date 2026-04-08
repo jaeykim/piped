@@ -14,7 +14,7 @@ export default function AuthLayout({
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600">
           <Zap className="h-6 w-6 text-white" />
         </div>
-        <span className="text-2xl font-bold text-gray-900">Piped</span>
+        <span className="text-2xl font-bold text-gray-900">Maktmakr</span>
       </Link>
       <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-sm border border-gray-200">
         {children}

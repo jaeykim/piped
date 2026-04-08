@@ -70,7 +70,7 @@ export default function OnboardingPage() {
     <div className="flex flex-col items-center justify-center py-20">
       <div className="flex items-center gap-2 mb-4">
         <Zap className="h-5 w-5 text-indigo-600" />
-        <span className="text-sm font-medium text-indigo-600">Piped</span>
+        <span className="text-sm font-medium text-indigo-600">Maktmakr</span>
       </div>
       {error ? (
         <p className="text-sm text-red-600">{error}</p>

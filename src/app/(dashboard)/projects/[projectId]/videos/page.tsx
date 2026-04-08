@@ -176,7 +176,7 @@ export default function VideosPage() {
                     {video?.status === "ready" && video.videoUrl && (
                       <a
                         href={video.videoUrl}
-                        download="piped-video.mp4"
+                        download="maktmakr-video.mp4"
                         className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
                       >
                         <Download className="h-4 w-4" />

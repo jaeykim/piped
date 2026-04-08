@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export const metadata = { title: "개인정보처리방침 — Piped" };
+export const metadata = { title: "개인정보처리방침 — Maktmakr" };
 
 export default function PrivacyPage() {
   return (
@@ -87,7 +87,7 @@ export default function PrivacyPage() {
         </section>
 
         <div className="mt-8 border-t border-gray-200 pt-6 text-xs text-gray-400">
-          <p>개인정보 관련 문의: privacy@piped.app</p>
+          <p>개인정보 관련 문의: privacy@maktmakr.com</p>
         </div>
       </div>
     </div>

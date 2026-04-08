@@ -37,7 +37,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600">
           <Zap className="h-4.5 w-4.5 text-white" />
         </div>
-        <span className="text-lg font-bold text-gray-900">Piped</span>
+        <span className="text-lg font-bold text-gray-900">Maktmakr</span>
       </div>
 
       {/* Meta connection status */}

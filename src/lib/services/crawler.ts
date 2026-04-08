@@ -38,7 +38,7 @@ async function fetchPage(url: string): Promise<{ html: string; ok: boolean }> {
     const response = await fetch(url, {
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (compatible; PipedBot/1.0; +https://piped.app)",
+          "Mozilla/5.0 (compatible; MaktmakrBot/1.0; +https://maktmakr.com)",
         Accept: "text/html,application/xhtml+xml",
       },
       redirect: "follow",

@@ -401,7 +401,7 @@ export interface AppText {
 const en: AppText = {
   auth: {
     welcomeBack: "Welcome back",
-    signInDesc: "Sign in to your Piped account",
+    signInDesc: "Sign in to your Maktmakr account",
     createAccount: "Create your account",
     signUpDesc: "Create AI-powered ad images in minutes",
     email: "Email",
@@ -419,7 +419,7 @@ const en: AppText = {
   },
   onboarding: {
     title: "Choose Your Role",
-    subtitle: "How will you use Piped?",
+    subtitle: "How will you use Maktmakr?",
     owner: "Maker",
     ownerDesc: "I want to create AI-powered ad images for my product or service.",
     influencer: "Influencer",
@@ -635,7 +635,7 @@ const en: AppText = {
     walletPlaceholder: "0x... or wallet address",
     walletSaved: "Wallet address saved",
     saveFailed: "Save failed",
-    integrationsInfo: "Piped automates AI-powered ad copy, creatives, and campaign setup. Ad budget charging and actual spend happen directly on each platform (Meta Ads, Google Ads). No ad spend is charged through Piped.",
+    integrationsInfo: "Maktmakr automates AI-powered ad copy, creatives, and campaign setup. Ad budget charging and actual spend happen directly on each platform (Meta Ads, Google Ads). No ad spend is charged through Maktmakr.",
     loading: "Loading...",
     connectionFailed: "Connection failed",
   },
@@ -729,7 +729,7 @@ const en: AppText = {
     influencerCreated: "Influencer campaign created!",
     signupTrackingGuide: "Signup Tracking Guide",
     purchaseTrackingGuide: "Purchase Tracking Guide",
-    autoTracked: "Auto-tracked: Users who sign up via Piped are tracked by referral cookie.",
+    autoTracked: "Auto-tracked: Users who sign up via Maktmakr are tracked by referral cookie.",
     externalSignupTracking: "External signup tracking: Add this code to your signup completion page:",
     externalPurchaseTracking: "External payment tracking: Call this on payment completion:",
     cookieAutoRead: "The referral cookie (piped_ref) is read automatically to attribute commissions.",
@@ -778,7 +778,7 @@ const en: AppText = {
 const ko: AppText = {
   auth: {
     welcomeBack: "돌아오신 것을 환영합니다",
-    signInDesc: "Piped 계정에 로그인하세요",
+    signInDesc: "Maktmakr 계정에 로그인하세요",
     createAccount: "계정 만들기",
     signUpDesc: "몇 분 만에 AI 광고 이미지를 만들어보세요",
     email: "이메일",
@@ -796,7 +796,7 @@ const ko: AppText = {
   },
   onboarding: {
     title: "역할을 선택하세요",
-    subtitle: "Piped를 어떻게 사용하실 건가요?",
+    subtitle: "Maktmakr를 어떻게 사용하실 건가요?",
     owner: "메이커",
     ownerDesc: "제품이나 서비스를 위한 AI 광고 이미지를 만들고 싶습니다.",
     influencer: "인플루언서",
@@ -1012,7 +1012,7 @@ const ko: AppText = {
     walletPlaceholder: "0x... 또는 지갑 주소 입력",
     walletSaved: "지갑 주소가 저장되었습니다",
     saveFailed: "저장 실패",
-    integrationsInfo: "Piped는 AI 기반 광고 카피·크리에이티브 생성과 캠페인 설정을 자동화합니다. 광고 예산 충전 및 실제 비용 집행은 각 플랫폼(Meta Ads, Google Ads)에서 직접 이루어지며, Piped를 통해 광고비가 결제되지 않습니다.",
+    integrationsInfo: "Maktmakr는 AI 기반 광고 카피·크리에이티브 생성과 캠페인 설정을 자동화합니다. 광고 예산 충전 및 실제 비용 집행은 각 플랫폼(Meta Ads, Google Ads)에서 직접 이루어지며, Maktmakr를 통해 광고비가 결제되지 않습니다.",
     loading: "로딩중...",
     connectionFailed: "연결에 실패했습니다",
   },
@@ -1106,7 +1106,7 @@ const ko: AppText = {
     influencerCreated: "인플루언서 캠페인이 생성되었습니다!",
     signupTrackingGuide: "가입 추적 설정 안내",
     purchaseTrackingGuide: "구매 추적 설정 안내",
-    autoTracked: "자동 추적됨: Piped를 통해 가입한 유저는 레퍼럴 쿠키로 자동 추적됩니다.",
+    autoTracked: "자동 추적됨: Maktmakr를 통해 가입한 유저는 레퍼럴 쿠키로 자동 추적됩니다.",
     externalSignupTracking: "외부 서비스 가입 추적: 가입 완료 페이지에 아래 코드를 추가하세요:",
     externalPurchaseTracking: "외부 결제 추적: 결제 완료 시 아래 코드를 호출하세요:",
     cookieAutoRead: "레퍼럴 쿠키 (piped_ref)가 자동으로 읽혀서 인플루언서에게 커미션이 지급됩니다.",
@@ -1157,7 +1157,7 @@ const ja: AppText = {
   auth: {
     ...en.auth,
     welcomeBack: "おかえりなさい",
-    signInDesc: "Pipedアカウントにログイン",
+    signInDesc: "Maktmakrアカウントにログイン",
     createAccount: "アカウント作成",
     signUpDesc: "数分でマーケティング自動化を開始",
     email: "メール",
@@ -1172,7 +1172,7 @@ const ja: AppText = {
   onboarding: {
     ...en.onboarding,
     title: "役割を選択",
-    subtitle: "Pipedをどのように使いますか？",
+    subtitle: "Maktmakrをどのように使いますか？",
     owner: "メーカー",
     ownerDesc: "プロダクトを作り、AIでマーケティングを自動化したい。",
     influencer: "インフルエンサー",
@@ -1188,7 +1188,7 @@ const zh: AppText = {
   auth: {
     ...en.auth,
     welcomeBack: "欢迎回来",
-    signInDesc: "登录您的Piped账户",
+    signInDesc: "登录您的Maktmakr账户",
     createAccount: "创建账户",
     signUpDesc: "几分钟内开始营销自动化",
     email: "邮箱",
@@ -1203,7 +1203,7 @@ const zh: AppText = {
   onboarding: {
     ...en.onboarding,
     title: "选择角色",
-    subtitle: "您将如何使用Piped？",
+    subtitle: "您将如何使用Maktmakr？",
     owner: "创客",
     ownerDesc: "我创建了产品，想用AI自动化营销。",
     influencer: "网红",

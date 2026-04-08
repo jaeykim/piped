@@ -440,13 +440,13 @@ export default function CreativesPage() {
       // Export to blob
       const blob = await new Promise<Blob>((resolve) => canvas.toBlob((b) => resolve(b!), "image/png"));
       const safePlatform = fmt.platform.replace(/[^a-z0-9]/g, "_");
-      zip.file(`piped_${safePlatform}_${fmt.size}.png`, blob);
+      zip.file(`maktmakr_${safePlatform}_${fmt.size}.png`, blob);
     }
 
     const zipBlob = await zip.generateAsync({ type: "blob" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(zipBlob);
-    link.download = `piped_creatives_${creative.concept}.zip`;
+    link.download = `maktmakr_creatives_${creative.concept}.zip`;
     link.click();
     URL.revokeObjectURL(link.href);
   };
@@ -1382,7 +1382,7 @@ export default function CreativesPage() {
               <div className="mt-2 flex gap-2">
                 <a
                   href={videoUrl}
-                  download="piped-ad-video.mp4"
+                  download="maktmakr-ad-video.mp4"
                   className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
                 >
                   <Package className="h-3.5 w-3.5" />

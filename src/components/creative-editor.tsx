@@ -330,7 +330,7 @@ export function CreativeEditor({ data, onClose, onSave }: Props) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const link = document.createElement("a");
-    link.download = `piped-${data.size}.png`;
+    link.download = `maktmakr-${data.size}.png`;
     link.href = canvas.toDataURL("image/png");
     link.click();
   };
