@@ -1,0 +1,393 @@
+// Piped — self-hosted Postgres schema.
+//
+// Auth still lives in Firebase (we verify ID tokens on the API side); the
+// `User` row keys off the Firebase UID, which is why `id` is a string and
+// not an autoincrement.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Users ───
+
+enum UserRole {
+  owner
+  influencer
+}
+
+model User {
+  id                 String    @id // Firebase UID
+  email              String    @unique
+  displayName        String
+  photoURL           String?
+  role               UserRole  @default(owner)
+  credits            Int       @default(0)
+  onboardingComplete Boolean   @default(false)
+
+  // Meta integration
+  metaAccessToken String?
+  metaAdAccountId String?
+  metaExpiresAt   DateTime?
+  metaConnectedAt DateTime?
+
+  // Google Ads integration
+  googleRefreshToken String?
+  googleCustomerId   String?
+
+  // Payout settings (for affiliates)
+  cryptoNetwork String?
+  cryptoAddress String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projects          Project[]
+  campaigns         Campaign[]
+  affiliatePrograms AffiliateProgram[]
+  optimizationLogs  OptimizationLog[]
+  payoutRequests    PayoutRequest[]
+
+  @@index([email])
+}
+
+// ─── Projects (one per analyzed product/site) ───
+
+enum ProjectStatus {
+  crawling
+  analyzed
+  generating
+  ready
+  error
+}
+
+enum PipelineStage {
+  analysis
+  copy
+  creatives
+  campaigns
+  affiliates
+}
+
+enum CampaignType {
+  influencer
+  meta
+  google
+}
+
+model Project {
+  id            String        @id @default(cuid())
+  ownerId       String
+  url           String
+  name          String
+  status        ProjectStatus @default(crawling)
+  pipelineStage PipelineStage @default(analysis)
+  campaignType  CampaignType?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner             User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  analysis          SiteAnalysis?
+  copyVariants      CopyVariant[]
+  creatives         Creative[]
+  campaigns         Campaign[]
+  affiliatePrograms AffiliateProgram[]
+
+  @@index([ownerId, createdAt(sort: Desc)])
+}
+
+// ─── Site analysis (1:1 with Project) ───
+
+model SiteAnalysis {
+  projectId        String   @id
+  rawHtmlUrl       String?
+  extractedText    String   @db.Text
+  metaTitle        String
+  metaDescription  String   @db.Text
+  ogImage          String?
+  ogTitle          String?
+  ogDescription    String?  @db.Text
+  keywords         String?
+  productName      String
+  valueProposition String   @db.Text
+  targetAudience   String[] // text[]
+  keyFeatures      String[]
+  tone             String
+  industry         String
+  brandColors      String[]
+  logoUrl          String?
+  screenshots      String[]
+  analyzedAt       DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// ─── Copy variants ───
+
+enum CopyType {
+  headline
+  description_short
+  description_long
+  ad_meta
+  ad_google
+  social
+  cta
+}
+
+model CopyVariant {
+  id            String   @id @default(cuid())
+  projectId     String
+  type          CopyType
+  content       String   @db.Text
+  isEdited      Boolean  @default(false)
+  isFavorited   Boolean  @default(false)
+  editedContent String?  @db.Text
+  createdAt     DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt(sort: Desc)])
+}
+
+// ─── Ad creatives ───
+
+enum CreativeStatus {
+  generating
+  ready
+  failed
+}
+
+model Creative {
+  id          String         @id @default(cuid())
+  projectId   String
+  imageUrl    String         @db.Text
+  prompt      String         @db.Text
+  size        String // "1080x1080", "1200x628", etc.
+  platform    String // instagram, facebook, google_display, general
+  concept     String // benefit-driven, pain-point, etc.
+  subject     String? // graphic-card, product-ui, etc.
+  overlayText String?
+  status      CreativeStatus @default(generating)
+  createdAt   DateTime       @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt(sort: Desc)])
+}
+
+// ─── Campaigns ───
+
+enum CampaignPlatform {
+  meta
+  google
+}
+
+enum CampaignStatus {
+  draft
+  pending
+  active
+  paused
+  completed
+  archived
+  error
+}
+
+enum CampaignObjective {
+  traffic
+  conversions
+  awareness
+}
+
+model Campaign {
+  id                   String            @id @default(cuid())
+  projectId            String?
+  ownerId              String
+  platform             CampaignPlatform
+  platformCampaignId   String?
+  platformAdSetId      String?
+  platformAdId         String?
+  name                 String
+  status               CampaignStatus    @default(draft)
+  objective            CampaignObjective @default(traffic)
+  budgetAmount         Float
+  budgetCurrency       String            @default("USD")
+  budgetType           String            @default("daily")
+  originalDailyBudget  Float?
+  // Targeting
+  ageMin               Int               @default(18)
+  ageMax               Int               @default(65)
+  genders              String[]
+  locations            String[]
+  interests            String[]
+  // Autopilot
+  targetRoas           Float?
+  optimizationEnabled  Boolean           @default(false)
+
+  selectedCopyIds     String[]
+  selectedCreativeIds String[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner            User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  project          Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  optimizationLogs OptimizationLog[]
+
+  @@index([ownerId, createdAt(sort: Desc)])
+  @@index([platform, optimizationEnabled])
+}
+
+// ─── Optimizer audit log ───
+
+enum OptimizerKind {
+  noop
+  pause
+  scale_budget
+  skip
+  error
+}
+
+model OptimizationLog {
+  id              String        @id @default(cuid())
+  campaignDocId   String
+  ownerId         String
+  kind            OptimizerKind
+  reason          String
+  recentRoas      Float?
+  recentSpend     Float?
+  targetRoas      Float?
+  nextDailyBudget Float?
+  createdAt       DateTime      @default(now())
+
+  campaign Campaign @relation(fields: [campaignDocId], references: [id], onDelete: Cascade)
+  owner    User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([campaignDocId, createdAt(sort: Desc)])
+  @@index([ownerId, createdAt(sort: Desc)])
+}
+
+// ─── Affiliates ───
+
+enum CommissionType {
+  percentage
+  fixed
+}
+
+enum ProgramStatus {
+  active
+  paused
+  closed
+}
+
+model AffiliateProgram {
+  id                 String         @id @default(cuid())
+  projectId          String
+  ownerId            String
+  name               String
+  description        String         @db.Text
+  commissionType     CommissionType
+  commissionValue    Float
+  cookieDurationDays Int            @default(30)
+  status             ProgramStatus  @default(active)
+  totalAffiliates    Int            @default(0)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  project Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  owner   User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  links   AffiliateLink[]
+  events  AffiliateEvent[]
+
+  @@index([ownerId])
+}
+
+model AffiliateLink {
+  id             String   @id @default(cuid())
+  programId      String
+  influencerId   String
+  code           String   @unique
+  destinationUrl String   @db.Text
+  clicks         Int      @default(0)
+  conversions    Int      @default(0)
+  earnings       Float    @default(0)
+  createdAt      DateTime @default(now())
+
+  program AffiliateProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  events  AffiliateEvent[]
+
+  @@index([programId])
+  @@index([influencerId])
+}
+
+enum AffiliateEventType {
+  click
+  conversion
+}
+
+model AffiliateEvent {
+  id              String             @id @default(cuid())
+  linkId          String
+  programId       String
+  influencerId    String
+  type            AffiliateEventType
+  conversionValue Float?
+  commission      Float?
+  eventType       String?
+  createdAt       DateTime           @default(now())
+
+  link    AffiliateLink    @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  program AffiliateProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@index([linkId, createdAt(sort: Desc)])
+  @@index([programId, createdAt(sort: Desc)])
+}
+
+enum PayoutStatus {
+  pending
+  approved
+  paid
+  rejected
+}
+
+model PayoutRequest {
+  id             String       @id @default(cuid())
+  influencerId   String
+  amount         Float
+  status         PayoutStatus @default(pending)
+  paymentMethod  String?
+  paymentDetails String?      @db.Text
+  note           String?      @db.Text
+  createdAt      DateTime     @default(now())
+  processedAt    DateTime?
+
+  influencer User @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+
+  @@index([influencerId, createdAt(sort: Desc)])
+}
+
+// ─── Daily metric snapshots (cached from Meta Insights) ───
+//
+// Optional cache so the dashboard doesn't hammer the Meta API on every load
+// and so we have history if a campaign is later archived.
+
+model CampaignMetricSnapshot {
+  id              String   @id @default(cuid())
+  campaignId      String
+  date            DateTime @db.Date
+  spend           Float    @default(0)
+  impressions     Int      @default(0)
+  clicks          Int      @default(0)
+  ctr             Float    @default(0)
+  cpc             Float    @default(0)
+  conversions     Int      @default(0)
+  conversionValue Float    @default(0)
+  roas            Float    @default(0)
+  capturedAt      DateTime @default(now())
+
+  @@unique([campaignId, date])
+  @@index([campaignId, date(sort: Desc)])
+}
