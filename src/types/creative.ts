@@ -140,8 +140,8 @@ export const CREATIVE_CONCEPTS: ConceptInfo[] = [
     description: "경쟁사 대비 우리의 장점을 직접 비교",
     descriptionEn: "Direct comparison showing why we're better",
     hookStrategy: "왜 우리 제품이 더 나은지 한눈에",
-    exampleHook: "기존 방식 vs Maktmakr — 뭐가 다를까?",
-    exampleHookEn: "Old way vs Maktmakr — what's different?",
+    exampleHook: "기존 방식 vs MaktMakr — 뭐가 다를까?",
+    exampleHookEn: "Old way vs MaktMakr — what's different?",
     category: "advanced",
   },
   {

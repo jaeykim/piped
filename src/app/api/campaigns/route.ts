@@ -21,6 +21,22 @@ export async function GET(request: NextRequest) {
         ...(projectId ? { projectId } : {}),
       },
       orderBy: { createdAt: "desc" },
+      include: {
+        // Pull the most recent creative from the linked project so the
+        // /campaigns page can render a thumbnail.
+        project: {
+          select: {
+            id: true,
+            name: true,
+            url: true,
+            creatives: {
+              orderBy: { createdAt: "desc" },
+              take: 1,
+              select: { id: true, imageUrl: true },
+            },
+          },
+        },
+      },
     });
 
     // Re-shape to match the legacy `Campaign` interface the client uses.
@@ -52,6 +68,8 @@ export async function GET(request: NextRequest) {
       bidStrategy: c.bidStrategy,
       scheduleStart: c.scheduleStart,
       scheduleEnd: c.scheduleEnd,
+      creativeThumbnail: c.project?.creatives?.[0]?.imageUrl ?? null,
+      projectName: c.project?.name ?? null,
       targetRoas: c.targetRoas,
       optimizationEnabled: c.optimizationEnabled,
       selectedCopyIds: c.selectedCopyIds,

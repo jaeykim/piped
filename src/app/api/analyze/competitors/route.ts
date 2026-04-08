@@ -109,7 +109,7 @@ Include 3-5 competitors and 3 recommended ad angles. Be specific and actionable.
         if (!comp.url) return comp;
         try {
           const pageRes = await fetch(comp.url, {
-            headers: { "User-Agent": "Mozilla/5.0 (compatible; MaktmakrBot/1.0)" },
+            headers: { "User-Agent": "Mozilla/5.0 (compatible; MaktMakrBot/1.0)" },
             signal: AbortSignal.timeout(5000),
           });
           if (!pageRes.ok) return comp;

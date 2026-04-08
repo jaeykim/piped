@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export const metadata = { title: "개인정보처리방침 — Maktmakr" };
+export const metadata = { title: "개인정보처리방침 — MaktMakr" };
 
 export default function PrivacyPage() {
   return (

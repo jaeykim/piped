@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Megaphone,
-  ImageIcon,
   BarChart3,
   Settings,
   LogOut,
@@ -22,10 +21,12 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useLocale();
   const metaConnected = !!profile?.integrations?.meta?.accessToken;
 
+  // Creatives intentionally not in the top-level nav — they're created
+  // as part of the campaign flow, not a separate concept. Reachable via
+  // /projects from the campaign wizard.
   const nav = [
     { label: t.sidebar.dashboard, href: "/dashboard", icon: LayoutDashboard },
     { label: t.sidebar.campaigns, href: "/campaigns", icon: Megaphone },
-    { label: t.sidebar.creatives, href: "/projects", icon: ImageIcon },
     { label: t.sidebar.reports, href: "/reports", icon: BarChart3 },
     { label: t.sidebar.settings, href: "/settings", icon: Settings },
   ];
@@ -37,7 +38,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600">
           <Zap className="h-4.5 w-4.5 text-white" />
         </div>
-        <span className="text-lg font-bold text-gray-900">Maktmakr</span>
+        <span className="text-lg font-bold text-gray-900">MaktMakr</span>
       </div>
 
       {/* Meta connection status */}

@@ -146,6 +146,67 @@ export default function SettingsPage() {
 
   const metaConnected = !!profile?.integrations?.meta?.accessToken;
   const googleConnected = !!profile?.integrations?.google?.refreshToken;
+
+  // Meta ad accounts (when connected, list all accessible accounts so the
+  // user can switch between them).
+  interface MetaAccount {
+    id: string;
+    name: string;
+    currency: string;
+    status?: number;
+    amountSpent: number;
+    balance: number;
+  }
+  const [metaAccounts, setMetaAccounts] = useState<MetaAccount[]>([]);
+  const [currentAdAccount, setCurrentAdAccount] = useState<string | null>(null);
+  const [adAccountSwitching, setAdAccountSwitching] = useState(false);
+  const [adAccountError, setAdAccountError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!metaConnected) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await getAuth_().currentUser?.getIdToken();
+        const res = await fetch("/api/meta/ad-accounts", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        setMetaAccounts(data.accounts || []);
+        setCurrentAdAccount(data.currentAdAccountId || null);
+        if (data.error) setAdAccountError(data.error);
+      } catch {
+        /* silent */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [metaConnected]);
+
+  const handleSwitchAdAccount = async (id: string) => {
+    setAdAccountSwitching(true);
+    try {
+      const token = await getAuth_().currentUser?.getIdToken();
+      const res = await fetch("/api/meta/ad-accounts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ adAccountId: id }),
+      });
+      if (!res.ok) throw new Error("switch failed");
+      setCurrentAdAccount(id);
+      await refreshProfile();
+      toast("success", t.settings.profileUpdated);
+    } catch {
+      toast("error", t.settings.updateFailed);
+    } finally {
+      setAdAccountSwitching(false);
+    }
+  };
   const [selectedPack, setSelectedPack] = useState<string>("growth");
   const [buyingPack, setBuyingPack] = useState<string | null>(null);
   const [billingEmail, setBillingEmail] = useState(profile?.email || "");
@@ -378,23 +439,70 @@ export default function SettingsPage() {
                 {t.settings.integrationsInfo}
               </p>
             </div>
-            <div className="flex items-center justify-between rounded-lg border p-4">
-              <div>
-                <p className="font-medium text-gray-900">{t.settings.metaAds}</p>
-                <p className="text-sm text-gray-500">{t.settings.metaAdsDesc}</p>
+            <div className="rounded-lg border p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-gray-900">{t.settings.metaAds}</p>
+                  <p className="text-sm text-gray-500">{t.settings.metaAdsDesc}</p>
+                </div>
+                {metaConnected ? (
+                  <Badge variant="success">{t.settings.connected}</Badge>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={async () => {
+                    try {
+                      const token = await getAuth_().currentUser?.getIdToken();
+                      const res = await fetch("/api/auth/meta-ads", { headers: { Authorization: `Bearer ${token}` } });
+                      if (res.ok) { const { authUrl } = await res.json(); window.location.href = authUrl; }
+                    } catch { toast("error", t.settings.connectFailed); }
+                  }}>
+                    {t.settings.connect}
+                  </Button>
+                )}
               </div>
-              {metaConnected ? (
-                <Badge variant="success">{t.settings.connected}</Badge>
-              ) : (
-                <Button size="sm" variant="outline" onClick={async () => {
-                  try {
-                    const token = await getAuth_().currentUser?.getIdToken();
-                    const res = await fetch("/api/auth/meta-ads", { headers: { Authorization: `Bearer ${token}` } });
-                    if (res.ok) { const { authUrl } = await res.json(); window.location.href = authUrl; }
-                  } catch { toast("error", t.settings.connectFailed); }
-                }}>
-                  {t.settings.connect}
-                </Button>
+
+              {/* Ad account picker / creation guide — only when connected */}
+              {metaConnected && (
+                <div className="mt-4 border-t border-gray-100 pt-4">
+                  <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                    광고 계정 (Ad Account)
+                  </label>
+                  {metaAccounts.length === 0 && !adAccountError && (
+                    <p className="text-xs text-gray-400">불러오는 중…</p>
+                  )}
+                  {metaAccounts.length > 0 && (
+                    <select
+                      value={currentAdAccount ?? ""}
+                      onChange={(e) => handleSwitchAdAccount(e.target.value)}
+                      disabled={adAccountSwitching}
+                      className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+                    >
+                      {metaAccounts.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name} · {a.currency}
+                          {a.status === 1 ? "" : a.status === 2 ? " (Disabled)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {(adAccountError ||
+                    (metaAccounts.length === 0 && currentAdAccount === null)) && (
+                    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                      <p className="font-medium">광고 계정이 없거나 가져오지 못했어요.</p>
+                      <p className="mt-1">
+                        Meta Business Suite에서 무료로 광고 계정을 만든 다음
+                        다시 연결하세요.{" "}
+                        <a
+                          href="https://business.facebook.com/"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-medium text-indigo-600 hover:underline"
+                        >
+                          Meta Business Suite 열기 →
+                        </a>
+                      </p>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 

@@ -35,7 +35,7 @@ export default async function LandingPage() {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 to-indigo-600">
               <Zap className="h-5 w-5 text-white" />
             </div>
-            <span className="text-xl font-bold text-gray-900">Maktmakr</span>
+            <span className="text-xl font-bold text-gray-900">MaktMakr</span>
           </div>
           <div className="flex items-center gap-4">
             <Link
@@ -191,8 +191,8 @@ export default async function LandingPage() {
                 color: "bg-emerald-100 text-emerald-700",
                 stars: 5,
                 quote: locale === "ko"
-                  ? "에이전시한테 매달 내던 돈으로 Maktmakr를 돌렸더니 CPA가 30% 떨어졌어요. 매시간 소재를 바꿔주는 게 진짜 차이를 만듭니다."
-                  : "Replaced my agency retainer with Maktmakr — CPA dropped 30% in two weeks. The hourly creative refresh is what actually moves the needle.",
+                  ? "에이전시한테 매달 내던 돈으로 MaktMakr를 돌렸더니 CPA가 30% 떨어졌어요. 매시간 소재를 바꿔주는 게 진짜 차이를 만듭니다."
+                  : "Replaced my agency retainer with MaktMakr — CPA dropped 30% in two weeks. The hourly creative refresh is what actually moves the needle.",
               },
               {
                 name: locale === "ko" ? "박재현" : "James Park",
@@ -212,7 +212,7 @@ export default async function LandingPage() {
                 stars: 5,
                 quote: locale === "ko"
                   ? "목표 ROAS 3 잡고 두면 알아서 거기까지 끌어올립니다. 안 될 때는 알람도 와요. 마음 편해요."
-                  : "Set a target ROAS of 3, walked away. Maktmakr gets there and pings me only when something needs my attention.",
+                  : "Set a target ROAS of 3, walked away. MaktMakr gets there and pings me only when something needs my attention.",
               },
               {
                 name: locale === "ko" ? "정도윤" : "David Jung",
@@ -231,8 +231,8 @@ export default async function LandingPage() {
                 color: "bg-cyan-100 text-cyan-700",
                 stars: 5,
                 quote: locale === "ko"
-                  ? "클라이언트 10곳 광고를 혼자 돌리는 데 Maktmakr 없이는 불가능했을 거예요. 자동 생성 + 자동 최적화가 진짜."
-                  : "Running ads for 10 clients solo would be impossible without Maktmakr. Auto-generation plus auto-optimization is the unlock.",
+                  ? "클라이언트 10곳 광고를 혼자 돌리는 데 MaktMakr 없이는 불가능했을 거예요. 자동 생성 + 자동 최적화가 진짜."
+                  : "Running ads for 10 clients solo would be impossible without MaktMakr. Auto-generation plus auto-optimization is the unlock.",
               },
             ].map((testimonial, i) => (
               <ScrollReveal key={i} delay={i * 80}>
@@ -327,7 +327,7 @@ export default async function LandingPage() {
       {/* ─── Footer ─── */}
       <footer className="relative z-10 border-t border-amber-100/60 py-8 bg-[#FFF9F5]">
         <div className="mx-auto max-w-7xl px-6 text-center text-sm text-gray-400">
-          &copy; {new Date().getFullYear()} Maktmakr. {t.footer}
+          &copy; {new Date().getFullYear()} MaktMakr. {t.footer}
         </div>
       </footer>
     </div>

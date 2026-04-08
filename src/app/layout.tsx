@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Maktmakr - Marketing Automation for Builders",
+  title: "MaktMakr - Marketing Automation for Builders",
   description:
     "Turn your website into a marketing machine. Auto-generate copy, creatives, and launch ads in minutes.",
 };

@@ -1120,8 +1120,8 @@ export default function NewCampaignPage() {
               <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
                 <p className="text-xs text-blue-800">
                   {isKo
-                    ? `💡 아래 예산은 ${platform === "meta" ? "Meta Ads" : "Google Ads"} 계정에서 직접 과금됩니다. Maktmakr 크레딧과는 별개이며, 해당 플랫폼에 결제 수단이 등록되어 있어야 합니다.`
-                    : `💡 The budget below will be charged directly to your ${platform === "meta" ? "Meta Ads" : "Google Ads"} account. This is separate from Maktmakr credits — ensure you have a payment method set up on the platform.`}
+                    ? `💡 아래 예산은 ${platform === "meta" ? "Meta Ads" : "Google Ads"} 계정에서 직접 과금됩니다. MaktMakr 크레딧과는 별개이며, 해당 플랫폼에 결제 수단이 등록되어 있어야 합니다.`
+                    : `💡 The budget below will be charged directly to your ${platform === "meta" ? "Meta Ads" : "Google Ads"} account. This is separate from MaktMakr credits — ensure you have a payment method set up on the platform.`}
                 </p>
               </div>
 
@@ -1288,8 +1288,8 @@ export default function NewCampaignPage() {
                       </div>
                       <p className="mt-0.5 text-xs text-violet-700">
                         {isKo
-                          ? "Maktmakr가 1시간마다 지표를 읽고 목표 ROAS에 도달할 때까지 광고를 최적화합니다."
-                          : "Maktmakr reads metrics hourly and optimizes ads until your target ROAS is hit."}
+                          ? "MaktMakr가 1시간마다 지표를 읽고 목표 ROAS에 도달할 때까지 광고를 최적화합니다."
+                          : "MaktMakr reads metrics hourly and optimizes ads until your target ROAS is hit."}
                       </p>
                     </div>
                     <label className="relative inline-flex shrink-0 cursor-pointer items-center">
@@ -1327,7 +1327,7 @@ export default function NewCampaignPage() {
                       <p className="mt-2 text-[11px] text-violet-700">
                         {isKo
                           ? `현재 ROAS가 ${targetRoas}x 미만이면 부진한 광고를 자동 일시정지하고, 위너에 예산을 재분배합니다.`
-                          : `If ROAS drops below ${targetRoas}x, Maktmakr pauses underperformers and reallocates budget to winners.`}
+                          : `If ROAS drops below ${targetRoas}x, MaktMakr pauses underperformers and reallocates budget to winners.`}
                       </p>
                     </div>
                   )}

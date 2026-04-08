@@ -29,6 +29,8 @@ interface CampaignDoc {
   targetRoas?: number | null;
   optimizationEnabled?: boolean;
   createdAt?: { seconds: number };
+  creativeThumbnail?: string | null;
+  projectName?: string | null;
 }
 
 export default function CampaignsPage() {
@@ -190,7 +192,23 @@ export default function CampaignsPage() {
         <div className="mt-6 space-y-3">
           {campaigns.map((c) => (
             <Card key={c.id}>
-              <CardContent className="flex items-center justify-between gap-4">
+              <CardContent className="flex items-center gap-4">
+                {/* Creative thumbnail */}
+                <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                  {c.creativeThumbnail ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={c.creativeThumbnail}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-[10px] text-gray-400">
+                      no img
+                    </div>
+                  )}
+                </div>
+
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <p className="truncate font-medium text-gray-900">{c.name}</p>
@@ -198,6 +216,9 @@ export default function CampaignsPage() {
                     <Badge variant="info">{c.platform.toUpperCase()}</Badge>
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+                    {c.projectName && (
+                      <span className="text-gray-400">📁 {c.projectName}</span>
+                    )}
                     {c.budget && (
                       <span>
                         ${c.budget.amount}/{isKo ? "일" : "day"}

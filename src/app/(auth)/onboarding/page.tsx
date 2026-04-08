@@ -12,9 +12,12 @@ export default function OnboardingPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // If already onboarded, redirect immediately
+    // If already onboarded with at least one ad platform connected, go
+    // straight to the dashboard. Otherwise route through the connect step.
     if (profile) {
-      router.push("/dashboard");
+      const hasMeta = !!profile.integrations?.meta?.accessToken;
+      const hasGoogle = !!profile.integrations?.google?.refreshToken;
+      router.push(hasMeta || hasGoogle ? "/dashboard" : "/onboarding/connect");
       return;
     }
 
@@ -52,7 +55,9 @@ export default function OnboardingPage() {
         } catch { /* silent — don't block onboarding */ }
 
         if (!cancelled) {
-          router.push("/dashboard");
+          // Newly created profile → push through the connect step. Users
+          // can skip from there if they want to look around first.
+          router.push("/onboarding/connect");
         }
       } catch (err) {
         if (!cancelled) {
@@ -70,7 +75,7 @@ export default function OnboardingPage() {
     <div className="flex flex-col items-center justify-center py-20">
       <div className="flex items-center gap-2 mb-4">
         <Zap className="h-5 w-5 text-indigo-600" />
-        <span className="text-sm font-medium text-indigo-600">Maktmakr</span>
+        <span className="text-sm font-medium text-indigo-600">MaktMakr</span>
       </div>
       {error ? (
         <p className="text-sm text-red-600">{error}</p>
