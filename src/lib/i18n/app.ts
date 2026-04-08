@@ -34,6 +34,9 @@ export interface AppText {
   // Sidebar
   sidebar: {
     dashboard: string;
+    campaigns: string;
+    creatives: string;
+    reports: string;
     projects: string;
     browsePrograms: string;
     partnerHub: string;
@@ -211,9 +214,46 @@ export interface AppText {
     connectFailed: string;
     googleConnected: string;
     googleFailed: string;
+    metaConnected: string;
+    metaFailed: string;
     security: string;
     resetPassword: string;
     resetSent: string;
+    // Credits
+    creditsTitle: string;
+    creditsUnit: string;
+    perCredit: string;
+    receiptEmail: string;
+    agreeTermsLabel: string;
+    termsLink: string;
+    privacyLink: string;
+    agreeRefundLabel: string;
+    payCard: string;
+    payCrypto: string;
+    cryptoOff: string;
+    cryptoNetworks: string;
+    creditUsage: string;
+    siteAnalysis: string;
+    copyGeneration: string;
+    imageGraphic: string;
+    imageAi: string;
+    videoGeneration: string;
+    campaignCreation: string;
+    creditCharged: string;
+    chargeFailed: string;
+    paymentCancelled: string;
+    // Payout
+    payoutTitle: string;
+    payoutDesc: string;
+    network: string;
+    walletAddress: string;
+    walletPlaceholder: string;
+    walletSaved: string;
+    saveFailed: string;
+    // Integrations info
+    integrationsInfo: string;
+    loading: string;
+    connectionFailed: string;
   };
   // Campaigns
   campaigns: {
@@ -363,7 +403,7 @@ const en: AppText = {
     welcomeBack: "Welcome back",
     signInDesc: "Sign in to your Piped account",
     createAccount: "Create your account",
-    signUpDesc: "Start automating your marketing in minutes",
+    signUpDesc: "Create AI-powered ad images in minutes",
     email: "Email",
     password: "Password",
     displayName: "Display Name",
@@ -381,7 +421,7 @@ const en: AppText = {
     title: "Choose Your Role",
     subtitle: "How will you use Piped?",
     owner: "Maker",
-    ownerDesc: "I built a product and want to automate marketing with AI-generated copy, creatives, and ad campaigns.",
+    ownerDesc: "I want to create AI-powered ad images for my product or service.",
     influencer: "Influencer",
     influencerDesc: "I want to discover great products, promote them to my audience, and earn commissions.",
     continue: "Continue",
@@ -389,7 +429,10 @@ const en: AppText = {
   },
   sidebar: {
     dashboard: "Dashboard",
-    projects: "Campaigns",
+    campaigns: "Campaigns",
+    creatives: "Creatives",
+    reports: "Reports",
+    projects: "Projects",
     browsePrograms: "Browse Programs",
     partnerHub: "Partner Hub",
     myPrograms: "My Programs",
@@ -402,13 +445,13 @@ const en: AppText = {
   dashboard: {
     title: "Dashboard",
     welcomeBack: "Welcome back",
-    newProject: "New Campaign",
-    recentProjects: "Recent Campaigns",
-    noProjects: "No campaigns yet",
-    noProjectsDesc: "Create your first campaign to start the marketing pipeline.",
+    newProject: "New Project",
+    recentProjects: "Recent Projects",
+    noProjects: "No projects yet",
+    noProjectsDesc: "Create your first project to generate AI ad images.",
     createProject: "Create Campaign",
-    projectCount: "Campaigns",
-    campaignCount: "Campaigns",
+    projectCount: "Projects",
+    campaignCount: "Images",
     affiliateCount: "Affiliates",
     welcomeInfluencer: "Welcome",
     influencerDesc: "Discover products to promote and earn commissions.",
@@ -417,17 +460,17 @@ const en: AppText = {
     myEarnings: "My Earnings",
     trackCommissions: "Track your commissions",
     deleteConfirm: 'Delete campaign "{name}"? This cannot be undone.',
-    deleted: "Campaign deleted",
+    deleted: "Project deleted",
     deleteFailed: "Failed to delete",
   },
   projects: {
-    title: "New Campaign",
-    newProject: "New Campaign",
-    enterUrl: "Enter your website URL",
-    enterUrlDesc: "We'll crawl and analyze your page with AI",
+    title: "New Project",
+    newProject: "New Project",
+    enterUrl: "Enter your product URL",
+    enterUrlDesc: "AI will analyze your page and create ad images",
     urlPlaceholder: "https://your-product.com",
-    startPipeline: "Start Pipeline",
-    creating: "Creating campaign...",
+    startPipeline: "Generate Ad Images",
+    creating: "Creating project...",
     crawling: "Crawling website...",
     analyzed: "Website analyzed successfully!",
     analysisFailed: "Analysis failed",
@@ -558,15 +601,49 @@ const en: AppText = {
     connectFailed: "Connection failed",
     googleConnected: "Google Ads connected!",
     googleFailed: "Google Ads connection failed",
+    metaConnected: "Meta Ads connected!",
+    metaFailed: "Meta Ads connection failed",
     security: "Security",
     resetPassword: "Reset Password",
     resetSent: "Password reset email sent!",
+    creditsTitle: "Credits",
+    creditsUnit: "credits",
+    perCredit: "per credit",
+    receiptEmail: "Receipt email",
+    agreeTermsLabel: "I agree to the",
+    termsLink: "Terms of Service",
+    privacyLink: "Privacy Policy",
+    agreeRefundLabel: "Credits are digital goods charged immediately upon purchase and are non-refundable.",
+    payCard: "Pay with Card",
+    payCrypto: "Pay with Crypto",
+    cryptoOff: "5% OFF",
+    cryptoNetworks: "Crypto: Ethereum · Arbitrum · Base · BSC (USDT/USDC)",
+    creditUsage: "Credit Usage",
+    siteAnalysis: "Site analysis: 5",
+    copyGeneration: "Copy generation: 10",
+    imageGraphic: "Image (graphic): 5",
+    imageAi: "Image (AI): 15",
+    videoGeneration: "Video generation: 30",
+    campaignCreation: "Campaign creation: 5",
+    creditCharged: "credits charged!",
+    chargeFailed: "Charge failed",
+    paymentCancelled: "Payment cancelled",
+    payoutTitle: "Payout Address",
+    payoutDesc: "Enter your crypto wallet address for affiliate earnings",
+    network: "Network",
+    walletAddress: "Wallet address",
+    walletPlaceholder: "0x... or wallet address",
+    walletSaved: "Wallet address saved",
+    saveFailed: "Save failed",
+    integrationsInfo: "Piped automates AI-powered ad copy, creatives, and campaign setup. Ad budget charging and actual spend happen directly on each platform (Meta Ads, Google Ads). No ad spend is charged through Piped.",
+    loading: "Loading...",
+    connectionFailed: "Connection failed",
   },
   campaigns: {
     title: "Campaigns",
     dashboard: "Campaign Dashboard",
-    newCampaign: "New Campaign",
-    noCampaigns: "No campaigns yet",
+    newCampaign: "New Project",
+    noCampaigns: "No projects yet",
     noCampaignsDesc: "Create your first ad campaign.",
     createFirst: "Create Campaign",
     platform: "Platform",
@@ -703,7 +780,7 @@ const ko: AppText = {
     welcomeBack: "돌아오신 것을 환영합니다",
     signInDesc: "Piped 계정에 로그인하세요",
     createAccount: "계정 만들기",
-    signUpDesc: "몇 분 만에 마케팅 자동화를 시작하세요",
+    signUpDesc: "몇 분 만에 AI 광고 이미지를 만들어보세요",
     email: "이메일",
     password: "비밀번호",
     displayName: "이름",
@@ -721,7 +798,7 @@ const ko: AppText = {
     title: "역할을 선택하세요",
     subtitle: "Piped를 어떻게 사용하실 건가요?",
     owner: "메이커",
-    ownerDesc: "제품을 만들었고, AI 기반 마케팅 자동화(카피, 크리에이티브, 광고 캠페인)를 원합니다.",
+    ownerDesc: "제품이나 서비스를 위한 AI 광고 이미지를 만들고 싶습니다.",
     influencer: "인플루언서",
     influencerDesc: "좋은 제품을 발견하고, 홍보하여 커미션을 받고 싶습니다.",
     continue: "계속하기",
@@ -729,7 +806,10 @@ const ko: AppText = {
   },
   sidebar: {
     dashboard: "대시보드",
-    projects: "캠페인",
+    campaigns: "캠페인",
+    creatives: "광고 소재",
+    reports: "리포트",
+    projects: "프로젝트",
     browsePrograms: "프로그램 둘러보기",
     partnerHub: "파트너 허브",
     myPrograms: "내 프로그램",
@@ -742,13 +822,13 @@ const ko: AppText = {
   dashboard: {
     title: "대시보드",
     welcomeBack: "돌아오셨군요",
-    newProject: "새 캠페인",
-    recentProjects: "최근 캠페인",
-    noProjects: "캠페인이 없습니다",
-    noProjectsDesc: "첫 번째 캠페인을 만들어 마케팅 파이프라인을 시작하세요.",
+    newProject: "새 프로젝트",
+    recentProjects: "최근 프로젝트",
+    noProjects: "프로젝트가 없습니다",
+    noProjectsDesc: "첫 번째 프로젝트를 만들어 AI 광고 이미지를 생성하세요.",
     createProject: "캠페인 만들기",
-    projectCount: "캠페인",
-    campaignCount: "캠페인",
+    projectCount: "프로젝트",
+    campaignCount: "이미지",
     affiliateCount: "제휴",
     welcomeInfluencer: "환영합니다",
     influencerDesc: "제품을 발견하고 커미션을 받으세요.",
@@ -757,17 +837,17 @@ const ko: AppText = {
     myEarnings: "내 수익",
     trackCommissions: "커미션 추적",
     deleteConfirm: '"{name}" 캠페인을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.',
-    deleted: "캠페인이 삭제되었습니다",
+    deleted: "프로젝트가 삭제되었습니다",
     deleteFailed: "삭제에 실패했습니다",
   },
   projects: {
-    title: "새 캠페인",
-    newProject: "새 캠페인",
-    enterUrl: "웹사이트 URL을 입력하세요",
-    enterUrlDesc: "AI가 페이지를 크롤링하고 분석합니다",
+    title: "새 프로젝트",
+    newProject: "새 프로젝트",
+    enterUrl: "제품 URL을 입력하세요",
+    enterUrlDesc: "AI가 페이지를 분석하고 광고 이미지를 만들어줍니다",
     urlPlaceholder: "https://your-product.com",
-    startPipeline: "파이프라인 시작",
-    creating: "캠페인 생성중...",
+    startPipeline: "광고 이미지 생성",
+    creating: "프로젝트 생성중...",
     crawling: "웹사이트 크롤링중...",
     analyzed: "웹사이트 분석 완료!",
     analysisFailed: "분석에 실패했습니다",
@@ -898,15 +978,49 @@ const ko: AppText = {
     connectFailed: "연결에 실패했습니다",
     googleConnected: "Google Ads 계정이 연결되었습니다!",
     googleFailed: "Google Ads 연결 실패",
+    metaConnected: "Meta Ads 계정이 연결되었습니다!",
+    metaFailed: "Meta Ads 연결 실패",
     security: "보안",
     resetPassword: "비밀번호 재설정",
     resetSent: "비밀번호 재설정 이메일을 보냈습니다!",
+    creditsTitle: "크레딧",
+    creditsUnit: "크레딧",
+    perCredit: "크레딧당",
+    receiptEmail: "영수증 이메일",
+    agreeTermsLabel: "동의합니다",
+    termsLink: "이용약관",
+    privacyLink: "개인정보처리방침",
+    agreeRefundLabel: "크레딧은 디지털 상품으로 구매 즉시 충전되며, 환불이 불가함을 확인합니다.",
+    payCard: "카드로 결제하기",
+    payCrypto: "크립토로 결제하기",
+    cryptoOff: "5% OFF",
+    cryptoNetworks: "크립토: Ethereum · Arbitrum · Base · BSC (USDT/USDC)",
+    creditUsage: "크레딧 소모량",
+    siteAnalysis: "사이트 분석: 5",
+    copyGeneration: "카피 생성: 10",
+    imageGraphic: "이미지 (그래픽): 5",
+    imageAi: "이미지 (AI): 15",
+    videoGeneration: "영상 생성: 30",
+    campaignCreation: "캠페인 생성: 5",
+    creditCharged: "크레딧이 충전되었습니다!",
+    chargeFailed: "충전에 실패했습니다",
+    paymentCancelled: "결제가 취소되었습니다",
+    payoutTitle: "정산 수령 주소",
+    payoutDesc: "제휴 수익을 수령할 크립토 지갑 주소를 입력하세요",
+    network: "네트워크",
+    walletAddress: "지갑 주소",
+    walletPlaceholder: "0x... 또는 지갑 주소 입력",
+    walletSaved: "지갑 주소가 저장되었습니다",
+    saveFailed: "저장 실패",
+    integrationsInfo: "Piped는 AI 기반 광고 카피·크리에이티브 생성과 캠페인 설정을 자동화합니다. 광고 예산 충전 및 실제 비용 집행은 각 플랫폼(Meta Ads, Google Ads)에서 직접 이루어지며, Piped를 통해 광고비가 결제되지 않습니다.",
+    loading: "로딩중...",
+    connectionFailed: "연결에 실패했습니다",
   },
   campaigns: {
     title: "캠페인",
     dashboard: "캠페인 대시보드",
-    newCampaign: "새 캠페인",
-    noCampaigns: "캠페인이 없습니다",
+    newCampaign: "새 프로젝트",
+    noCampaigns: "프로젝트가 없습니다",
     noCampaignsDesc: "첫 번째 광고 캠페인을 만들어보세요.",
     createFirst: "캠페인 만들기",
     platform: "플랫폼",
