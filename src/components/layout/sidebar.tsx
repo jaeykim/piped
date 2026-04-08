@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Megaphone,
-  BarChart3,
   Settings,
   LogOut,
   Zap,
@@ -24,10 +23,11 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   // Creatives intentionally not in the top-level nav — they're created
   // as part of the campaign flow, not a separate concept. Reachable via
   // /projects from the campaign wizard.
+  // Reports also dropped: the dashboard already shows everything a
+  // report would, so there's no second view to maintain.
   const nav = [
     { label: t.sidebar.dashboard, href: "/dashboard", icon: LayoutDashboard },
     { label: t.sidebar.campaigns, href: "/campaigns", icon: Megaphone },
-    { label: t.sidebar.reports, href: "/reports", icon: BarChart3 },
     { label: t.sidebar.settings, href: "/settings", icon: Settings },
   ];
 
