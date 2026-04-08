@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Piped optimization loop every hour
+Requires=piped-optimize.service
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target
