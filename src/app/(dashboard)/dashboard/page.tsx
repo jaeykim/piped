@@ -10,6 +10,11 @@ import {
   Target,
   AlertCircle,
   Plus,
+  Pause,
+  Play,
+  Activity,
+  Zap,
+  ShoppingCart,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -20,6 +25,8 @@ import {
   Tooltip,
   CartesianGrid,
   Legend,
+  AreaChart,
+  Area,
 } from "recharts";
 import { getAuth_ } from "@/lib/firebase/client";
 import { useAuth } from "@/context/auth-context";
@@ -28,6 +35,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
+import { useToast } from "@/components/ui/toast";
 
 interface DailyMetric {
   date: string;
@@ -58,6 +66,7 @@ interface CampaignSummary {
   name: string;
   status: string;
   targetRoas: number | null;
+  series: DailyMetric[];
   totals: Totals;
 }
 
@@ -69,16 +78,52 @@ interface InsightsResponse {
   campaigns: CampaignSummary[];
 }
 
+interface OptimizationLogEntry {
+  id: string;
+  campaignId: string;
+  campaignName: string;
+  kind: "noop" | "pause" | "scale_budget" | "skip" | "error";
+  reason: string;
+  recentRoas: number | null;
+  recentSpend: number | null;
+  targetRoas: number | null;
+  nextDailyBudget: number | null;
+  createdAt: string;
+}
+
+const fmtMoney = (n: number) =>
+  `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+const fmtCompact = (n: number) =>
+  n >= 1_000_000
+    ? `${(n / 1_000_000).toFixed(1)}M`
+    : n >= 1000
+    ? `${(n / 1000).toFixed(1)}k`
+    : Math.round(n).toString();
+
+function relativeTime(iso: string, isKo: boolean): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const m = Math.round(ms / 60000);
+  if (m < 1) return isKo ? "방금 전" : "just now";
+  if (m < 60) return isKo ? `${m}분 전` : `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return isKo ? `${h}시간 전` : `${h}h ago`;
+  const d = Math.round(h / 24);
+  return isKo ? `${d}일 전` : `${d}d ago`;
+}
+
 export default function DashboardPage() {
   const { profile } = useAuth();
   const { locale } = useLocale();
+  const { toast } = useToast();
   const isKo = locale.startsWith("ko");
   const metaConnected = !!profile?.integrations?.meta?.accessToken;
 
   const [days, setDays] = useState(14);
   const [data, setData] = useState<InsightsResponse | null>(null);
+  const [logs, setLogs] = useState<OptimizationLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!profile || !metaConnected) {
@@ -89,12 +134,18 @@ export default function DashboardPage() {
     setError(false);
     try {
       const token = await getAuth_().currentUser?.getIdToken();
-      const res = await fetch(`/api/campaigns/meta/insights?days=${days}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("failed");
-      const json = (await res.json()) as InsightsResponse;
+      const headers = { Authorization: `Bearer ${token}` };
+      const [insightsRes, logsRes] = await Promise.all([
+        fetch(`/api/campaigns/meta/insights?days=${days}`, { headers }),
+        fetch(`/api/optimization-logs?limit=30`, { headers }),
+      ]);
+      if (!insightsRes.ok) throw new Error("insights failed");
+      const json = (await insightsRes.json()) as InsightsResponse;
       setData(json);
+      if (logsRes.ok) {
+        const lj = await logsRes.json();
+        setLogs((lj.logs || []) as OptimizationLogEntry[]);
+      }
     } catch {
       setError(true);
     } finally {
@@ -105,6 +156,55 @@ export default function DashboardPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const handleToggleStatus = async (
+    campaignId: string,
+    currentStatus: string
+  ) => {
+    setTogglingId(campaignId);
+    const next = currentStatus === "active" ? "PAUSED" : "ACTIVE";
+    try {
+      const token = await getAuth_().currentUser?.getIdToken();
+      // We need the platform campaign ID — fetch the campaign row
+      const cRes = await fetch(`/api/campaigns`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!cRes.ok) throw new Error("fetch campaigns failed");
+      const { campaigns } = await cRes.json();
+      const c = campaigns.find(
+        (x: { id: string; platformCampaignId?: string }) => x.id === campaignId
+      );
+      if (!c?.platformCampaignId) throw new Error("missing platform id");
+      const res = await fetch("/api/campaigns/meta/control", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          campaignDocId: campaignId,
+          adId: c.platformCampaignId,
+          status: next,
+        }),
+      });
+      if (!res.ok) throw new Error("toggle failed");
+      toast(
+        "success",
+        next === "ACTIVE"
+          ? isKo
+            ? "재개됨"
+            : "Resumed"
+          : isKo
+          ? "일시정지됨"
+          : "Paused"
+      );
+      await load();
+    } catch {
+      toast("error", isKo ? "변경 실패" : "Update failed");
+    } finally {
+      setTogglingId(null);
+    }
+  };
 
   // ─── Empty / unconnected states ───
   if (!metaConnected) {
@@ -152,27 +252,70 @@ export default function DashboardPage() {
   const campaigns = data?.campaigns ?? [];
   const hasData = daily.length > 0;
 
-  const fmtMoney = (n: number) =>
-    `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-  const fmtCompact = (n: number) =>
-    n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toString();
+  const tileSpec = [
+    {
+      icon: DollarSign,
+      label: isKo ? "총 지출" : "Spend",
+      value: totals ? fmtMoney(totals.spend) : "—",
+      color: "bg-indigo-50 text-indigo-600",
+    },
+    {
+      icon: Eye,
+      label: isKo ? "노출" : "Impressions",
+      value: totals ? fmtCompact(totals.impressions) : "—",
+      color: "bg-blue-50 text-blue-600",
+    },
+    {
+      icon: MousePointerClick,
+      label: isKo ? "클릭" : "Clicks",
+      value: totals ? fmtCompact(totals.clicks) : "—",
+      color: "bg-cyan-50 text-cyan-600",
+    },
+    {
+      icon: Activity,
+      label: "CTR",
+      value: totals ? `${totals.ctr.toFixed(2)}%` : "—",
+      color: "bg-emerald-50 text-emerald-600",
+    },
+    {
+      icon: ShoppingCart,
+      label: isKo ? "전환" : "Conversions",
+      value: totals ? fmtCompact(totals.conversions) : "—",
+      color: "bg-amber-50 text-amber-600",
+    },
+    {
+      icon: TrendingUp,
+      label: "ROAS",
+      value: totals ? `${totals.roas.toFixed(2)}x` : "—",
+      color: "bg-violet-50 text-violet-600",
+    },
+  ];
+
+  // Funnel: max value normalises bar widths
+  const funnelMax = Math.max(
+    totals?.impressions ?? 0,
+    totals?.clicks ?? 0,
+    totals?.conversions ?? 0,
+    1
+  );
 
   return (
     <div>
-      <div className="flex items-center justify-between">
+      {/* ─── Header ─── */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
             {isKo ? "대시보드" : "Dashboard"}
           </h1>
-          <p className="mt-1 text-gray-600">
+          <p className="mt-1 text-sm text-gray-500">
             {isKo
-              ? `최근 ${days}일 메타 광고 지표`
-              : `Last ${days} days of Meta ad performance`}
+              ? `최근 ${days}일 메타 광고 성과 + 자동화 활동`
+              : `Last ${days} days of Meta performance + automation activity`}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex rounded-lg border border-gray-200 bg-white p-0.5">
-            {[7, 14, 30].map((d) => (
+            {[1, 7, 14, 30].map((d) => (
               <button
                 key={d}
                 onClick={() => setDays(d)}
@@ -182,7 +325,7 @@ export default function DashboardPage() {
                     : "text-gray-500 hover:text-gray-900"
                 }`}
               >
-                {d}d
+                {d === 1 ? (isKo ? "오늘" : "Today") : `${d}d`}
               </button>
             ))}
           </div>
@@ -208,166 +351,282 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* Summary tiles */}
-      {totals && (
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            {
-              icon: DollarSign,
-              label: isKo ? "총 지출" : "Spend",
-              value: fmtMoney(totals.spend),
-              color: "bg-indigo-50 text-indigo-600",
-            },
-            {
-              icon: Eye,
-              label: isKo ? "노출" : "Impressions",
-              value: fmtCompact(totals.impressions),
-              color: "bg-blue-50 text-blue-600",
-            },
-            {
-              icon: MousePointerClick,
-              label: isKo ? "CTR" : "CTR",
-              value: `${totals.ctr.toFixed(2)}%`,
-              color: "bg-emerald-50 text-emerald-600",
-            },
-            {
-              icon: TrendingUp,
-              label: "ROAS",
-              value: `${totals.roas.toFixed(2)}x`,
-              color: "bg-violet-50 text-violet-600",
-            },
-          ].map((s) => {
-            const Icon = s.icon;
-            return (
-              <Card key={s.label}>
-                <CardContent className="flex items-center gap-3">
-                  <div
-                    className={`flex h-11 w-11 items-center justify-center rounded-lg ${s.color}`}
-                  >
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">{s.label}</p>
-                    <p className="text-xl font-bold text-gray-900">{s.value}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+      {/* ─── Summary tiles ─── */}
+      <div className="mt-6 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {tileSpec.map((s) => {
+          const Icon = s.icon;
+          return (
+            <Card key={s.label}>
+              <CardContent className="flex items-center gap-3 py-4">
+                <div
+                  className={`flex h-10 w-10 items-center justify-center rounded-lg ${s.color}`}
+                >
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] text-gray-500">{s.label}</p>
+                  <p className="truncate text-lg font-bold text-gray-900">
+                    {s.value}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
 
-      {/* Chart */}
-      <Card className="mt-6">
-        <CardContent className="pt-6">
-          <p className="mb-3 text-sm font-semibold text-gray-700">
-            {isKo ? "일별 지출 & ROAS" : "Daily Spend & ROAS"}
-          </p>
-          {hasData ? (
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart
-                data={daily}
-                margin={{ top: 6, right: 12, left: 0, bottom: 0 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 11, fill: "#94a3b8" }}
-                  tickFormatter={(d: string) => d.slice(5)}
-                />
-                <YAxis
-                  yAxisId="left"
-                  tick={{ fontSize: 11, fill: "#94a3b8" }}
-                  tickFormatter={(v: number) => `$${v}`}
-                />
-                <YAxis
-                  yAxisId="right"
-                  orientation="right"
-                  tick={{ fontSize: 11, fill: "#94a3b8" }}
-                  tickFormatter={(v: number) => `${v.toFixed(1)}x`}
-                />
-                <Tooltip
-                  contentStyle={{
-                    fontSize: 12,
-                    borderRadius: 8,
-                    border: "1px solid #e2e8f0",
-                  }}
-                />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Line
-                  yAxisId="left"
-                  type="monotone"
-                  dataKey="spend"
-                  name={isKo ? "지출" : "Spend"}
-                  stroke="#6366f1"
-                  strokeWidth={2}
-                  dot={false}
-                />
-                <Line
-                  yAxisId="right"
-                  type="monotone"
-                  dataKey="roas"
-                  name="ROAS"
-                  stroke="#a855f7"
-                  strokeWidth={2}
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex h-[200px] items-center justify-center text-sm text-gray-400">
-              {isKo
-                ? "표시할 데이터가 없습니다. 캠페인을 발행하면 지표가 여기 나타납니다."
-                : "No data yet. Launch a campaign and metrics will appear here."}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* ─── Spend / ROAS chart + Funnel ─── */}
+      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardContent className="pt-6">
+            <p className="mb-3 text-sm font-semibold text-gray-700">
+              {isKo ? "일별 지출 & ROAS" : "Daily Spend & ROAS"}
+            </p>
+            {hasData ? (
+              <ResponsiveContainer width="100%" height={260}>
+                <LineChart
+                  data={daily}
+                  margin={{ top: 6, right: 12, left: 0, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 11, fill: "#94a3b8" }}
+                    tickFormatter={(d: string) => d.slice(5)}
+                  />
+                  <YAxis
+                    yAxisId="left"
+                    tick={{ fontSize: 11, fill: "#94a3b8" }}
+                    tickFormatter={(v: number) => `$${v}`}
+                  />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    tick={{ fontSize: 11, fill: "#94a3b8" }}
+                    tickFormatter={(v: number) => `${v.toFixed(1)}x`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      fontSize: 12,
+                      borderRadius: 8,
+                      border: "1px solid #e2e8f0",
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Line
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="spend"
+                    name={isKo ? "지출" : "Spend"}
+                    stroke="#6366f1"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="roas"
+                    name="ROAS"
+                    stroke="#a855f7"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-[200px] items-center justify-center text-sm text-gray-400">
+                {isKo
+                  ? "데이터 없음. 캠페인을 발행하면 여기 표시됩니다."
+                  : "No data yet. Launch a campaign and metrics will appear here."}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-      {/* Per-campaign list */}
+        {/* Conversion funnel */}
+        <Card>
+          <CardContent className="pt-6">
+            <p className="mb-3 text-sm font-semibold text-gray-700">
+              {isKo ? "전환 퍼널" : "Conversion Funnel"}
+            </p>
+            {totals && (
+              <div className="space-y-3">
+                {[
+                  {
+                    label: isKo ? "노출" : "Impressions",
+                    value: totals.impressions,
+                    color: "bg-blue-500",
+                  },
+                  {
+                    label: isKo ? "클릭" : "Clicks",
+                    value: totals.clicks,
+                    color: "bg-cyan-500",
+                  },
+                  {
+                    label: isKo ? "전환" : "Conversions",
+                    value: totals.conversions,
+                    color: "bg-emerald-500",
+                  },
+                ].map((step) => {
+                  const pct = (step.value / funnelMax) * 100;
+                  return (
+                    <div key={step.label}>
+                      <div className="mb-1 flex justify-between text-xs">
+                        <span className="text-gray-500">{step.label}</span>
+                        <span className="font-semibold text-gray-900">
+                          {fmtCompact(step.value)}
+                        </span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-gray-100">
+                        <div
+                          className={`h-full rounded-full ${step.color} transition-all`}
+                          style={{ width: `${Math.max(2, pct)}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+                <div className="mt-3 border-t border-gray-100 pt-3 text-xs text-gray-500">
+                  <div className="flex justify-between">
+                    <span>{isKo ? "노출→클릭" : "Imp→Click"}</span>
+                    <span className="font-semibold text-gray-900">
+                      {totals.ctr.toFixed(2)}%
+                    </span>
+                  </div>
+                  <div className="mt-1 flex justify-between">
+                    <span>{isKo ? "클릭→전환" : "Click→Conv"}</span>
+                    <span className="font-semibold text-gray-900">
+                      {totals.clicks > 0
+                        ? `${((totals.conversions / totals.clicks) * 100).toFixed(2)}%`
+                        : "—"}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex justify-between">
+                    <span>CPA</span>
+                    <span className="font-semibold text-gray-900">
+                      {totals.cpa > 0 ? fmtMoney(totals.cpa) : "—"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ─── Per-campaign cards with sparkline + inline action ─── */}
       {campaigns.length > 0 && (
         <div className="mt-6">
           <h2 className="text-sm font-semibold text-gray-700">
             {isKo ? "캠페인별 성과" : "Per-campaign performance"}
           </h2>
-          <div className="mt-3 space-y-2">
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
             {campaigns.map((c) => {
               const onTarget =
                 c.targetRoas == null || c.totals.roas >= c.targetRoas;
+              const sparklineData = c.series.length > 0
+                ? c.series
+                : [{ date: "", roas: 0, spend: 0 } as DailyMetric];
               return (
                 <Card key={c.campaignId}>
-                  <CardContent className="flex items-center justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="truncate text-sm font-medium text-gray-900">
-                          {c.name}
-                        </p>
-                        <Badge
-                          variant={c.status === "active" ? "success" : "warning"}
-                        >
-                          {c.status}
-                        </Badge>
+                  <CardContent className="py-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-sm font-medium text-gray-900">
+                            {c.name}
+                          </p>
+                          <Badge
+                            variant={
+                              c.status === "active" ? "success" : "warning"
+                            }
+                          >
+                            {c.status}
+                          </Badge>
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-gray-500">
+                          <span>{fmtMoney(c.totals.spend)} spend</span>
+                          <span>{c.totals.ctr.toFixed(2)}% CTR</span>
+                          <span>{fmtMoney(c.totals.cpa)} CPA</span>
+                          <span>{fmtCompact(c.totals.conversions)} conv</span>
+                        </div>
                       </div>
-                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-gray-500">
-                        <span>{fmtMoney(c.totals.spend)} spend</span>
-                        <span>{c.totals.ctr.toFixed(2)}% CTR</span>
-                        <span>{fmtMoney(c.totals.cpa)} CPA</span>
+                      <div className="text-right">
+                        <p
+                          className={`text-xl font-bold ${
+                            onTarget ? "text-emerald-600" : "text-amber-600"
+                          }`}
+                        >
+                          {c.totals.roas.toFixed(2)}x
+                        </p>
+                        {c.targetRoas != null && (
+                          <p className="flex items-center justify-end gap-0.5 text-[10px] text-gray-400">
+                            <Target className="h-2.5 w-2.5" />
+                            {c.targetRoas}x
+                          </p>
+                        )}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p
-                        className={`text-lg font-bold ${
-                          onTarget ? "text-emerald-600" : "text-amber-600"
-                        }`}
+
+                    {/* Sparkline */}
+                    <div className="mt-3 h-12">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart
+                          data={sparklineData}
+                          margin={{ top: 2, right: 0, bottom: 0, left: 0 }}
+                        >
+                          <defs>
+                            <linearGradient
+                              id={`grad-${c.campaignId}`}
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="0%"
+                                stopColor={onTarget ? "#10b981" : "#f59e0b"}
+                                stopOpacity={0.4}
+                              />
+                              <stop
+                                offset="100%"
+                                stopColor={onTarget ? "#10b981" : "#f59e0b"}
+                                stopOpacity={0}
+                              />
+                            </linearGradient>
+                          </defs>
+                          <Area
+                            type="monotone"
+                            dataKey="roas"
+                            stroke={onTarget ? "#10b981" : "#f59e0b"}
+                            strokeWidth={1.5}
+                            fill={`url(#grad-${c.campaignId})`}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    <div className="mt-3 flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        loading={togglingId === c.campaignId}
+                        onClick={() =>
+                          handleToggleStatus(c.campaignId, c.status)
+                        }
                       >
-                        {c.totals.roas.toFixed(2)}x
-                      </p>
-                      {c.targetRoas != null && (
-                        <p className="flex items-center justify-end gap-0.5 text-[10px] text-gray-400">
-                          <Target className="h-2.5 w-2.5" />
-                          {c.targetRoas}x
-                        </p>
-                      )}
+                        {c.status === "active" ? (
+                          <>
+                            <Pause className="mr-1 h-3.5 w-3.5" />
+                            {isKo ? "일시정지" : "Pause"}
+                          </>
+                        ) : (
+                          <>
+                            <Play className="mr-1 h-3.5 w-3.5" />
+                            {isKo ? "재개" : "Resume"}
+                          </>
+                        )}
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -376,6 +635,106 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* ─── Optimization activity feed ─── */}
+      <div className="mt-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-gray-700">
+            {isKo ? "자동 최적화 활동" : "Auto-optimization activity"}
+          </h2>
+          <span className="text-xs text-gray-400">
+            {isKo ? "1시간마다 실행" : "runs hourly"}
+          </span>
+        </div>
+        <Card className="mt-3">
+          <CardContent className="py-2">
+            {logs.length === 0 ? (
+              <div className="py-8 text-center">
+                <Zap className="mx-auto h-8 w-8 text-gray-300" />
+                <p className="mt-2 text-sm text-gray-500">
+                  {isKo
+                    ? "아직 최적화 활동이 없습니다. ROAS Autopilot을 켜고 첫 시간 cron 실행을 기다리세요."
+                    : "No optimization activity yet. Enable ROAS Autopilot and wait for the first hourly tick."}
+                </p>
+              </div>
+            ) : (
+              <ul className="divide-y divide-gray-100">
+                {logs.map((log) => {
+                  const meta = (() => {
+                    if (log.kind === "pause")
+                      return {
+                        icon: "⏸",
+                        color: "text-amber-600",
+                        label: isKo ? "일시정지" : "Paused",
+                      };
+                    if (log.kind === "scale_budget")
+                      return {
+                        icon: "📈",
+                        color: "text-emerald-600",
+                        label: isKo
+                          ? `예산 → $${log.nextDailyBudget}`
+                          : `Budget → $${log.nextDailyBudget}`,
+                      };
+                    if (log.kind === "error")
+                      return {
+                        icon: "⚠️",
+                        color: "text-red-600",
+                        label: isKo ? "에러" : "Error",
+                      };
+                    if (log.kind === "skip")
+                      return {
+                        icon: "⏭",
+                        color: "text-gray-400",
+                        label: isKo ? "건너뜀" : "Skipped",
+                      };
+                    return {
+                      icon: "✓",
+                      color: "text-gray-400",
+                      label: isKo ? "정상" : "Healthy",
+                    };
+                  })();
+                  return (
+                    <li
+                      key={log.id}
+                      className="flex items-center justify-between gap-3 py-2.5"
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="text-base">{meta.icon}</span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm text-gray-900">
+                            <span className={`font-medium ${meta.color}`}>
+                              {meta.label}
+                            </span>
+                            <span className="mx-1.5 text-gray-300">·</span>
+                            <span className="text-gray-600">
+                              {log.campaignName}
+                            </span>
+                          </p>
+                          <p className="text-[10px] text-gray-400">
+                            {log.recentRoas != null && (
+                              <>
+                                ROAS {log.recentRoas.toFixed(2)}x
+                                {log.targetRoas != null && (
+                                  <> (target {log.targetRoas}x)</>
+                                )}
+                                <span className="mx-1">·</span>
+                              </>
+                            )}
+                            {log.reason}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="shrink-0 text-[10px] text-gray-400">
+                        {relativeTime(log.createdAt, isKo)}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

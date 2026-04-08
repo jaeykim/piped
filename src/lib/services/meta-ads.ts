@@ -33,10 +33,21 @@ async function metaApiCall(
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(
-      error.error?.message || `Meta API error: ${response.status}`
-    );
+    const errBody = await response.json().catch(() => ({}));
+    const e = errBody.error || {};
+    // Meta's "Invalid parameter" alone is useless — pull every diagnostic
+    // field they return so we can actually debug from the journal.
+    const detail = [
+      e.message,
+      e.error_user_title && `(${e.error_user_title})`,
+      e.error_user_msg,
+      e.error_subcode && `subcode=${e.error_subcode}`,
+      e.fbtrace_id && `fbtrace=${e.fbtrace_id}`,
+    ]
+      .filter(Boolean)
+      .join(" — ");
+    console.error(`Meta API ${endpoint} failed:`, JSON.stringify(errBody));
+    throw new Error(detail || `Meta API error: ${response.status}`);
   }
 
   return response.json();

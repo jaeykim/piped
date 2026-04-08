@@ -26,6 +26,59 @@ import type { SiteAnalysis } from "@/types/analysis";
 
 type Step = "content" | "targeting" | "budget" | "review";
 
+// Curated country list — Meta accepts ISO-2 country codes. Top 16 markets
+// the user is most likely to target. Easy to extend if needed.
+const COUNTRY_OPTIONS: { code: string; label: string; flag: string }[] = [
+  { code: "US", label: "United States", flag: "🇺🇸" },
+  { code: "KR", label: "South Korea", flag: "🇰🇷" },
+  { code: "JP", label: "Japan", flag: "🇯🇵" },
+  { code: "GB", label: "United Kingdom", flag: "🇬🇧" },
+  { code: "CA", label: "Canada", flag: "🇨🇦" },
+  { code: "AU", label: "Australia", flag: "🇦🇺" },
+  { code: "DE", label: "Germany", flag: "🇩🇪" },
+  { code: "FR", label: "France", flag: "🇫🇷" },
+  { code: "IT", label: "Italy", flag: "🇮🇹" },
+  { code: "ES", label: "Spain", flag: "🇪🇸" },
+  { code: "BR", label: "Brazil", flag: "🇧🇷" },
+  { code: "MX", label: "Mexico", flag: "🇲🇽" },
+  { code: "IN", label: "India", flag: "🇮🇳" },
+  { code: "SG", label: "Singapore", flag: "🇸🇬" },
+  { code: "TW", label: "Taiwan", flag: "🇹🇼" },
+  { code: "VN", label: "Vietnam", flag: "🇻🇳" },
+];
+
+// Common Meta ad interest categories. These are free-form labels that the
+// backend forwards to Meta — Meta's own targeting search API would resolve
+// them to interest IDs in a future iteration.
+const INTEREST_OPTIONS: string[] = [
+  "Technology",
+  "Software",
+  "SaaS",
+  "Startups",
+  "Entrepreneurship",
+  "Marketing",
+  "E-commerce",
+  "Online shopping",
+  "Fashion",
+  "Beauty",
+  "Skincare",
+  "Fitness",
+  "Health & wellness",
+  "Food & drink",
+  "Travel",
+  "Education",
+  "Personal finance",
+  "Investing",
+  "Real estate",
+  "Parenting",
+  "Pets",
+  "Gaming",
+  "Music",
+  "Photography",
+  "Design",
+  "Productivity",
+];
+
 export default function NewCampaignPage() {
   const params = useParams();
   const router = useRouter();
@@ -54,6 +107,7 @@ export default function NewCampaignPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [analysis, setAnalysis] = useState<SiteAnalysis | null>(null);
+  const [projectUrl, setProjectUrl] = useState<string>("");
   const [copyVariants, setCopyVariants] = useState<CopyVariant[]>([]);
   const [creatives, setCreatives] = useState<Creative[]>([]);
 
@@ -61,11 +115,16 @@ export default function NewCampaignPage() {
   const [platform, setPlatform] = useState<"meta" | "google" | "influencer">("meta");
   const [selectedCopy, setSelectedCopy] = useState<string>("");
   const [selectedCreative, setSelectedCreative] = useState<string>("");
-  const [targeting, setTargeting] = useState({
+  const [targeting, setTargeting] = useState<{
+    ageMin: number;
+    ageMax: number;
+    locations: string[];
+    interests: string[];
+  }>({
     ageMin: 18,
     ageMax: 65,
-    locations: "US",
-    interests: "",
+    locations: ["US"],
+    interests: [],
   });
   const [monthlyBudget, setMonthlyBudget] = useState(500);
   const [dailyBudget, setDailyBudget] = useState(15);
@@ -102,6 +161,9 @@ export default function NewCampaignPage() {
       }
       const { project } = await res.json();
 
+      if (project?.url) {
+        setProjectUrl(project.url);
+      }
       if (project?.campaignType) {
         setPlatform(project.campaignType as "meta" | "google" | "influencer");
       }
@@ -211,7 +273,8 @@ export default function NewCampaignPage() {
         targeting: {
           ageMin: targeting.ageMin,
           ageMax: targeting.ageMax,
-          locations: targeting.locations.split(",").map((s) => s.trim()),
+          locations: targeting.locations,
+          interests: targeting.interests,
         },
       };
 
@@ -228,13 +291,19 @@ export default function NewCampaignPage() {
             description: "",
           };
         }
-        body.creativeUrl = creativeData?.imageUrl;
+        // Meta needs an absolute URL it can fetch — local /uploads/… paths
+        // are unreachable for it, so prefix with the public origin.
+        const rawCreativeUrl = creativeData?.imageUrl ?? "";
+        body.creativeUrl = rawCreativeUrl.startsWith("http")
+          ? rawCreativeUrl
+          : `${window.location.origin}${rawCreativeUrl}`;
         body.primaryText = adData.primaryText;
         body.headline = adData.headline;
         body.linkDescription = adData.description;
-        body.destinationUrl = analysis?.metaTags?.ogTitle
-          ? `https://${analysis.metaTags.ogTitle}`
-          : "";
+        // The destination is the project's actual website URL — the old
+        // code was reading metaTags.ogTitle (a page title, not a URL) and
+        // wrapping it in https://, which Meta rejected as Invalid parameter.
+        body.destinationUrl = projectUrl;
       } else {
         body.headlines = [
           analysis?.productName || "Try It Now",
@@ -245,7 +314,7 @@ export default function NewCampaignPage() {
           copyData?.content || analysis?.valueProposition || "",
           analysis?.valueProposition || "",
         ];
-        body.finalUrl = analysis?.metaTags?.ogTitle || "";
+        body.finalUrl = projectUrl;
       }
 
       const res = await fetch(endpoint, {
@@ -521,20 +590,34 @@ export default function NewCampaignPage() {
                     <button
                       key={c.id}
                       onClick={() => setSelectedCreative(c.id)}
-                      className={`overflow-hidden rounded-lg border-2 ${
+                      className={`relative overflow-hidden rounded-lg border-2 ${
                         selectedCreative === c.id
-                          ? "border-indigo-600 bg-indigo-50"
-                          : "border-gray-200"
+                          ? "border-indigo-600 ring-2 ring-indigo-200"
+                          : "border-gray-200 hover:border-gray-300"
                       }`}
                     >
-                      <div className="aspect-square flex items-center justify-center bg-gray-50 p-2">
-                        <div className="text-center">
-                          <p className="text-xs font-medium text-gray-700">{c.platform}</p>
-                          <p className="text-[10px] text-gray-400">{c.size}</p>
-                          {selectedCreative === c.id && (
-                            <p className="mt-1 text-[10px] font-bold text-indigo-600">{t.campaigns.selected}</p>
-                          )}
-                        </div>
+                      <div className="relative aspect-square bg-gray-50">
+                        {c.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={c.imageUrl}
+                            alt={`${c.platform} ${c.size}`}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-xs text-gray-400">
+                            no image
+                          </div>
+                        )}
+                        {selectedCreative === c.id && (
+                          <div className="absolute right-1 top-1 rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                            {t.campaigns.selected}
+                          </div>
+                        )}
+                      </div>
+                      <div className="border-t border-gray-100 bg-white px-2 py-1.5 text-center">
+                        <p className="text-[10px] font-medium text-gray-700">{c.platform}</p>
+                        <p className="text-[10px] text-gray-400">{c.size}</p>
                       </div>
                     </button>
                   ))}
@@ -616,22 +699,76 @@ export default function NewCampaignPage() {
                   }
                 />
               </div>
-              <Input
-                label={t.campaigns.locations}
-                value={targeting.locations}
-                onChange={(e) =>
-                  setTargeting({ ...targeting, locations: e.target.value })
-                }
-                placeholder="US, GB, CA"
-              />
-              <Input
-                label={t.campaigns.interests}
-                value={targeting.interests}
-                onChange={(e) =>
-                  setTargeting({ ...targeting, interests: e.target.value })
-                }
-                placeholder="Technology, Startups, SaaS"
-              />
+              {/* Location chips — click to toggle */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  {t.campaigns.locations}
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {COUNTRY_OPTIONS.map((c) => {
+                    const on = targeting.locations.includes(c.code);
+                    return (
+                      <button
+                        key={c.code}
+                        type="button"
+                        onClick={() =>
+                          setTargeting({
+                            ...targeting,
+                            locations: on
+                              ? targeting.locations.filter((x) => x !== c.code)
+                              : [...targeting.locations, c.code],
+                          })
+                        }
+                        className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                          on
+                            ? "border-indigo-600 bg-indigo-600 text-white"
+                            : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                        }`}
+                      >
+                        {c.flag} {c.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {targeting.locations.length === 0 && (
+                  <p className="mt-1 text-xs text-amber-600">
+                    {isKo ? "최소 1개 국가 선택" : "Pick at least one country"}
+                  </p>
+                )}
+              </div>
+
+              {/* Interest chips */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  {t.campaigns.interests}
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {INTEREST_OPTIONS.map((i) => {
+                    const on = targeting.interests.includes(i);
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() =>
+                          setTargeting({
+                            ...targeting,
+                            interests: on
+                              ? targeting.interests.filter((x) => x !== i)
+                              : [...targeting.interests, i],
+                          })
+                        }
+                        className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                          on
+                            ? "border-violet-600 bg-violet-600 text-white"
+                            : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                        }`}
+                      >
+                        {i}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
 
@@ -1030,7 +1167,7 @@ export default function NewCampaignPage() {
                     </div>
                     <div className="flex justify-between py-2 border-b">
                       <span className="text-gray-500">{t.campaigns.targetInfo}</span>
-                      <span className="font-medium">Ages {targeting.ageMin}-{targeting.ageMax}, {targeting.locations}</span>
+                      <span className="font-medium">Ages {targeting.ageMin}-{targeting.ageMax}, {targeting.locations.join(", ") || "-"}</span>
                     </div>
                     <div className="flex justify-between py-2">
                       <span className="text-gray-500">{t.campaigns.status}</span>
