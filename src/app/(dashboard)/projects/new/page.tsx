@@ -56,33 +56,67 @@ export default function NewProjectPage() {
     if (!validateUrl(url)) return;
 
     setLoading(true);
-    setStatus(t.projects.creating);
+    setStatus(isKo ? "프로젝트 생성 중…" : "Creating project…");
 
     try {
       const projectId = await createProject(profile.uid, url.trim(), url.trim());
-      setStatus(t.projects.crawling);
-
       const token = await getAuth_().currentUser?.getIdToken();
-      const response = await fetch("/api/crawl", {
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      };
+
+      // 1. Crawl + analyze the URL
+      setStatus(isKo ? "사이트 분석 중… (30초 정도)" : "Analyzing site… (~30s)");
+      let res = await fetch("/api/crawl", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
         body: JSON.stringify({ url: url.trim(), projectId, locale }),
       });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || t.projects.analysisFailed);
+      if (!res.ok) {
+        throw new Error((await res.json()).error || t.projects.analysisFailed);
       }
 
-      toast("success", t.projects.analyzed);
+      // 2. Generate copy variants
+      setStatus(isKo ? "광고 카피 생성 중…" : "Writing ad copy…");
+      res = await fetch("/api/copy/generate", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          projectId,
+          language: isKo ? "한국어" : "English",
+        }),
+      });
+      if (!res.ok) {
+        throw new Error((await res.json()).error || "copy generation failed");
+      }
+
+      // 3. Generate one creative — auto-pick benefit-driven graphic-card
+      setStatus(isKo ? "광고 이미지 생성 중… (1분 정도)" : "Generating ad image… (~1m)");
+      res = await fetch("/api/creatives/generate-one", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          projectId,
+          size: "1080x1080",
+          platform: "instagram",
+          concept: "benefit-driven",
+          subject: "graphic-card",
+          language: isKo ? "한국어" : "English",
+          country: isKo ? "대한민국" : "United States",
+        }),
+      });
+      // Creative gen failures aren't fatal — the wizard will show a "no
+      // creative yet" state and let the user generate one manually.
+      if (!res.ok) {
+        console.warn("creative generation skipped:", await res.text());
+      }
+
+      toast("success", isKo ? "광고 자료 준비 완료!" : "Ad assets ready!");
       refreshProfile();
-      router.push(`/projects/${projectId}`);
+      router.push(`/projects/${projectId}/campaigns/new`);
     } catch (error) {
       toast("error", error instanceof Error ? error.message : t.common.error);
-    } finally {
       setLoading(false);
       setStatus("");
     }

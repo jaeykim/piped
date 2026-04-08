@@ -261,6 +261,20 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        // Make sure sharp can actually decode whatever we picked up — many
+        // og:image URLs serve AVIF/ICO/animated WebP that sharp chokes on.
+        // Probe with metadata() before handing the buffer downstream.
+        if (screenshotBuffer) {
+          try {
+            const meta = await sharp(screenshotBuffer).metadata();
+            if (!meta.format) {
+              screenshotBuffer = null;
+            }
+          } catch {
+            screenshotBuffer = null;
+          }
+        }
+
         // Try to get an image for full-bleed background
         let imageBuffer: Buffer | null = screenshotBuffer;
 

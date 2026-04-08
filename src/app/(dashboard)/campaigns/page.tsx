@@ -9,6 +9,7 @@ import {
   Pause,
   Target,
   AlertCircle,
+  Copy,
 } from "lucide-react";
 import { getAuth_ } from "@/lib/firebase/client";
 import { useAuth } from "@/context/auth-context";
@@ -43,6 +44,7 @@ export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<CampaignDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [cloningId, setCloningId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!profile) return;
@@ -106,6 +108,27 @@ export default function CampaignsPage() {
       toast("error", isKo ? "변경 실패" : "Update failed");
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const handleClone = async (c: CampaignDoc) => {
+    setCloningId(c.id);
+    try {
+      const token = await getAuth_().currentUser?.getIdToken();
+      const res = await fetch(`/api/campaigns/${c.id}/clone`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "clone failed");
+      }
+      toast("success", isKo ? "복제됨 (일시정지 상태)" : "Cloned (paused)");
+      load();
+    } catch (e) {
+      toast("error", e instanceof Error ? e.message : isKo ? "복제 실패" : "Clone failed");
+    } finally {
+      setCloningId(null);
     }
   };
 
@@ -232,24 +255,35 @@ export default function CampaignsPage() {
                     )}
                   </div>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  loading={updatingId === c.id}
-                  onClick={() => handleToggleStatus(c)}
-                >
-                  {c.status === "active" ? (
-                    <>
-                      <Pause className="mr-1 h-3.5 w-3.5" />
-                      {isKo ? "일시정지" : "Pause"}
-                    </>
-                  ) : (
-                    <>
-                      <Play className="mr-1 h-3.5 w-3.5" />
-                      {isKo ? "재개" : "Resume"}
-                    </>
-                  )}
-                </Button>
+                <div className="flex flex-col gap-1.5">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    loading={updatingId === c.id}
+                    onClick={() => handleToggleStatus(c)}
+                  >
+                    {c.status === "active" ? (
+                      <>
+                        <Pause className="mr-1 h-3.5 w-3.5" />
+                        {isKo ? "일시정지" : "Pause"}
+                      </>
+                    ) : (
+                      <>
+                        <Play className="mr-1 h-3.5 w-3.5" />
+                        {isKo ? "재개" : "Resume"}
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    loading={cloningId === c.id}
+                    onClick={() => handleClone(c)}
+                  >
+                    <Copy className="mr-1 h-3.5 w-3.5" />
+                    {isKo ? "복제" : "Clone"}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))}

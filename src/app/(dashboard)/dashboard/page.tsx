@@ -398,6 +398,45 @@ export default function DashboardPage() {
         </Card>
       )}
 
+      {/* ─── Empty state — no campaigns yet ─── */}
+      {!loading && data && data.campaigns.length === 0 && (
+        <Card className="mt-6 border-2 border-dashed border-indigo-200 bg-gradient-to-br from-indigo-50/50 to-violet-50/50">
+          <CardContent className="py-12 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-lg shadow-violet-500/30">
+              <Plus className="h-7 w-7 text-white" />
+            </div>
+            <h2 className="mt-5 text-xl font-bold text-gray-900">
+              {isKo ? "첫 캠페인을 만들어보세요" : "Launch your first campaign"}
+            </h2>
+            <p className="mx-auto mt-2 max-w-md text-sm text-gray-600">
+              {isKo
+                ? "URL 하나만 입력하면 분석 → 카피 → 광고 이미지 → 메타 발행까지 한 번에. 1분이면 끝나요."
+                : "Drop in a URL — MaktMakr analyzes the site, writes copy, generates an ad image, and pushes it live to Meta. Takes about a minute."}
+            </p>
+            <Link href="/projects/new">
+              <Button className="mt-6" size="lg">
+                <Plus className="mr-1 h-4 w-4" />
+                {isKo ? "새 캠페인 만들기" : "Create a campaign"}
+              </Button>
+            </Link>
+            <div className="mt-6 grid grid-cols-3 gap-3 text-left text-xs text-gray-500 sm:mx-auto sm:max-w-md">
+              <div className="rounded-lg bg-white/60 p-3">
+                <p className="font-semibold text-gray-700">1️⃣ {isKo ? "URL 입력" : "Drop URL"}</p>
+                <p className="mt-1">{isKo ? "사이트 자동 분석" : "Auto-analyzed"}</p>
+              </div>
+              <div className="rounded-lg bg-white/60 p-3">
+                <p className="font-semibold text-gray-700">2️⃣ {isKo ? "AI 자동 생성" : "AI generates"}</p>
+                <p className="mt-1">{isKo ? "카피 + 이미지" : "Copy + image"}</p>
+              </div>
+              <div className="rounded-lg bg-white/60 p-3">
+                <p className="font-semibold text-gray-700">3️⃣ {isKo ? "자동 최적화" : "Auto-optimize"}</p>
+                <p className="mt-1">{isKo ? "1시간마다 ROAS" : "Hourly ROAS loop"}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ─── Summary tiles ─── */}
       <div className="mt-6 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {tileSpec.map((s) => {
@@ -625,6 +664,67 @@ export default function DashboardPage() {
               const sparklineData = c.series.length > 0
                 ? c.series
                 : [{ date: "", roas: 0, spend: 0 } as DailyMetric];
+
+              // Semantic status badge — much more useful than a flat
+              // active/paused tag.
+              type BadgeVariant =
+                | "default"
+                | "success"
+                | "warning"
+                | "error"
+                | "info";
+              const badge: { label: string; variant: BadgeVariant } = (() => {
+                if (c.status === "paused")
+                  return {
+                    label: isKo ? "⏸ 일시정지" : "⏸ Paused",
+                    variant: "warning" as BadgeVariant,
+                  };
+                if (c.status === "archived")
+                  return {
+                    label: isKo ? "보관됨" : "Archived",
+                    variant: "default" as BadgeVariant,
+                  };
+                if (c.totals.spend < 5)
+                  return {
+                    label: isKo ? "🆕 학습 중" : "🆕 Learning",
+                    variant: "info" as BadgeVariant,
+                  };
+                if (c.targetRoas == null)
+                  return {
+                    label: isKo ? "🟢 운영 중" : "🟢 Running",
+                    variant: "success" as BadgeVariant,
+                  };
+                const ratio = c.totals.roas / c.targetRoas;
+                if (ratio >= 1)
+                  return {
+                    label: isKo ? "✅ 목표 달성" : "✅ On target",
+                    variant: "success" as BadgeVariant,
+                  };
+                if (ratio >= 0.8)
+                  return {
+                    label: isKo ? "🟡 목표 근접" : "🟡 Near target",
+                    variant: "info" as BadgeVariant,
+                  };
+                if (ratio >= 0.5)
+                  return {
+                    label: isKo ? "⚠️ 검토 필요" : "⚠️ Needs attention",
+                    variant: "warning" as BadgeVariant,
+                  };
+                return {
+                  label: isKo ? "🔴 부진" : "🔴 Underperforming",
+                  variant: "error" as BadgeVariant,
+                };
+              })();
+
+              // Spend pacing — for the current period (days), are we burning
+              // budget faster than the calendar says we should?
+              const dailyCap = settings[c.campaignId]?.budget?.amount;
+              const expectedSpend = dailyCap ? dailyCap * days : 0;
+              const pacingPct =
+                expectedSpend > 0 ? (c.totals.spend / expectedSpend) * 100 : 0;
+              const overPacing = pacingPct > 110;
+              const underPacing = pacingPct < 70 && c.totals.spend > 0;
+
               return (
                 <Card key={c.campaignId}>
                   <CardContent className="py-4">
@@ -634,19 +734,27 @@ export default function DashboardPage() {
                           <p className="truncate text-sm font-medium text-gray-900">
                             {c.name}
                           </p>
-                          <Badge
-                            variant={
-                              c.status === "active" ? "success" : "warning"
-                            }
-                          >
-                            {c.status}
-                          </Badge>
+                          <Badge variant={badge.variant}>{badge.label}</Badge>
                         </div>
                         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-gray-500">
                           <span>{fmtMoney(c.totals.spend)} spend</span>
                           <span>{c.totals.ctr.toFixed(2)}% CTR</span>
                           <span>{fmtMoney(c.totals.cpa)} CPA</span>
                           <span>{fmtCompact(c.totals.conversions)} conv</span>
+                          {overPacing && (
+                            <span className="text-amber-600">
+                              {isKo
+                                ? `🔥 페이스 ${Math.round(pacingPct)}%`
+                                : `🔥 pacing ${Math.round(pacingPct)}%`}
+                            </span>
+                          )}
+                          {underPacing && (
+                            <span className="text-blue-500">
+                              {isKo
+                                ? `🐢 페이스 ${Math.round(pacingPct)}%`
+                                : `🐢 pacing ${Math.round(pacingPct)}%`}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="text-right">

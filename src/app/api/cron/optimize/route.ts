@@ -6,6 +6,7 @@ import {
   updateAdSetDailyBudget,
 } from "@/lib/services/meta-ads";
 import { decide, type OptimizerAction } from "@/lib/services/optimizer";
+import { sendTelegram } from "@/lib/services/notifier";
 
 // Hourly cron — auto-optimizes every campaign with optimizationEnabled=true.
 //
@@ -110,6 +111,13 @@ export async function GET(request: NextRequest) {
           });
           summary.paused++;
           summary.actions++;
+          await sendTelegram({
+            text:
+              `🚨 *${c.name}* 일시정지됨\n` +
+              `ROAS ${recentRoas.toFixed(2)}x (목표 ${c.targetRoas}x)\n` +
+              `최근 3일 지출 $${totals.spend.toFixed(0)}\n` +
+              `https://maktmakr.com/dashboard`,
+          });
         }
 
         if (action.kind === "scale_budget") {
@@ -138,6 +146,14 @@ export async function GET(request: NextRequest) {
           });
           summary.scaled++;
           summary.actions++;
+          const arrow = action.nextDailyBudget > currentDaily ? "📈" : "📉";
+          await sendTelegram({
+            text:
+              `${arrow} *${c.name}* 예산 조정\n` +
+              `$${currentDaily} → $${action.nextDailyBudget}/일\n` +
+              `ROAS ${recentRoas.toFixed(2)}x (목표 ${c.targetRoas}x)\n` +
+              `https://maktmakr.com/dashboard`,
+          });
         }
 
         await prisma.optimizationLog.create({

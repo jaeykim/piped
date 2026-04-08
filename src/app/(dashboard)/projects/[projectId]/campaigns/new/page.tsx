@@ -134,6 +134,10 @@ export default function NewCampaignPage() {
   const [optimizationEnabled, setOptimizationEnabled] = useState<boolean>(true);
   const [campaignName, setCampaignName] = useState("");
 
+  // Test budget mode — beginners can run a $10 / 2 day pilot to see if the
+  // creative + targeting actually click before committing real spend.
+  const [testBudgetMode, setTestBudgetMode] = useState(false);
+
   // Advanced (collapsed by default — beginners default to "easy" mode).
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [campaignObjective, setCampaignObjective] = useState<
@@ -1155,6 +1159,54 @@ export default function NewCampaignPage() {
                   </p>
                 </div>
               ) : null}
+
+              {/* Test budget mode — $10 over 2 days, auto-pauses */}
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !testBudgetMode;
+                  setTestBudgetMode(next);
+                  if (next) {
+                    setDailyBudget(5);
+                    setMonthlyBudget(10);
+                    // schedule end = 2 days from now
+                    const end = new Date();
+                    end.setDate(end.getDate() + 2);
+                    setScheduleEnd(end.toISOString().slice(0, 10));
+                  } else {
+                    setScheduleEnd("");
+                  }
+                }}
+                className={`w-full rounded-xl border-2 p-4 text-left transition-all ${
+                  testBudgetMode
+                    ? "border-amber-400 bg-amber-50"
+                    : "border-amber-200 bg-amber-50/30 hover:border-amber-300"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-amber-900">
+                      🐣 {isKo ? "체험 예산으로 시작" : "Try with a test budget"}
+                    </p>
+                    <p className="mt-0.5 text-xs text-amber-800">
+                      {isKo
+                        ? "$5/일, 2일 자동 종료. 광고 잘 굴러가는지 본 다음 본 예산으로 늘리세요."
+                        : "$5/day, auto-stops in 2 days. See if the ad clicks, then ramp to a real budget."}
+                    </p>
+                  </div>
+                  <div
+                    className={`flex h-5 w-9 items-center rounded-full p-0.5 transition-colors ${
+                      testBudgetMode ? "bg-amber-500" : "bg-gray-300"
+                    }`}
+                  >
+                    <div
+                      className={`h-4 w-4 rounded-full bg-white transition-transform ${
+                        testBudgetMode ? "translate-x-4" : ""
+                      }`}
+                    />
+                  </div>
+                </div>
+              </button>
 
               {/* Monthly Budget */}
               <div>
