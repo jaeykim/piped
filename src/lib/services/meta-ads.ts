@@ -240,6 +240,75 @@ export async function getMetaCampaignMetrics(
   };
 }
 
+// ─── Daily Time-Series Metrics ───
+
+export interface DailyMetric {
+  date: string; // YYYY-MM-DD
+  spend: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  cpc: number;
+  conversions: number;
+  conversionValue: number;
+  roas: number;
+}
+
+export async function getMetaCampaignDailyMetrics(
+  objectId: string,
+  accessToken: string,
+  days: number = 14
+): Promise<DailyMetric[]> {
+  const fields =
+    "date_start,impressions,clicks,spend,ctr,cpc,actions,action_values";
+  const url = `${META_BASE_URL}/${objectId}/insights?fields=${fields}&time_increment=1&date_preset=last_${days}_d&access_token=${accessToken}`;
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    return [];
+  }
+  const data = await response.json();
+  const rows = (data.data || []) as Array<{
+    date_start: string;
+    impressions?: string;
+    clicks?: string;
+    spend?: string;
+    ctr?: string;
+    cpc?: string;
+    actions?: { action_type: string; value: string }[];
+    action_values?: { action_type: string; value: string }[];
+  }>;
+
+  return rows.map((r) => {
+    const spend = parseFloat(r.spend || "0");
+    const purchaseValue = parseFloat(
+      r.action_values?.find((a) =>
+        ["purchase", "offsite_conversion.fb_pixel_purchase"].includes(
+          a.action_type
+        )
+      )?.value || "0"
+    );
+    const conversions = parseInt(
+      r.actions?.find((a) =>
+        ["purchase", "offsite_conversion.fb_pixel_purchase"].includes(
+          a.action_type
+        )
+      )?.value || "0"
+    );
+    return {
+      date: r.date_start,
+      spend,
+      impressions: parseInt(r.impressions || "0"),
+      clicks: parseInt(r.clicks || "0"),
+      ctr: parseFloat(r.ctr || "0"),
+      cpc: parseFloat(r.cpc || "0"),
+      conversions,
+      conversionValue: purchaseValue,
+      roas: spend > 0 ? purchaseValue / spend : 0,
+    };
+  });
+}
+
 // ─── Ad Control ───
 
 export async function updateAdStatus(
