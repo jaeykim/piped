@@ -36,6 +36,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 
 interface DailyMetric {
   date: string;
@@ -258,36 +259,54 @@ export default function DashboardPage() {
       label: isKo ? "총 지출" : "Spend",
       value: totals ? fmtMoney(totals.spend) : "—",
       color: "bg-indigo-50 text-indigo-600",
+      tip: isKo
+        ? "선택한 기간 동안 메타에 실제로 지출된 광고비 합계입니다."
+        : "Total ad spend on Meta during the selected period.",
     },
     {
       icon: Eye,
       label: isKo ? "노출" : "Impressions",
       value: totals ? fmtCompact(totals.impressions) : "—",
       color: "bg-blue-50 text-blue-600",
+      tip: isKo
+        ? "광고가 사용자에게 표시된 횟수입니다. 같은 사람이 두 번 봐도 2회로 카운트됩니다."
+        : "Number of times your ads were shown. The same person seeing the ad twice counts as 2.",
     },
     {
       icon: MousePointerClick,
       label: isKo ? "클릭" : "Clicks",
       value: totals ? fmtCompact(totals.clicks) : "—",
       color: "bg-cyan-50 text-cyan-600",
+      tip: isKo
+        ? "광고를 클릭해서 랜딩페이지로 이동한 횟수입니다."
+        : "Number of times someone clicked your ad and landed on your site.",
     },
     {
       icon: Activity,
       label: "CTR",
       value: totals ? `${totals.ctr.toFixed(2)}%` : "—",
       color: "bg-emerald-50 text-emerald-600",
+      tip: isKo
+        ? "Click-Through Rate = 클릭 ÷ 노출 × 100. 광고가 얼마나 매력적인지 보여주는 핵심 지표입니다. 1% 이상이면 양호합니다."
+        : "Click-Through Rate = Clicks ÷ Impressions × 100. How compelling your ad is. Above 1% is healthy.",
     },
     {
       icon: ShoppingCart,
       label: isKo ? "전환" : "Conversions",
       value: totals ? fmtCompact(totals.conversions) : "—",
       color: "bg-amber-50 text-amber-600",
+      tip: isKo
+        ? "광고를 보고 실제로 구매(또는 가입 등 목표 액션)를 완료한 횟수. 메타 픽셀이 사이트에 설치되어야 측정됩니다."
+        : "Number of completed purchases (or signup/etc.) attributed to your ads. Requires Meta Pixel on your site.",
     },
     {
       icon: TrendingUp,
       label: "ROAS",
       value: totals ? `${totals.roas.toFixed(2)}x` : "—",
       color: "bg-violet-50 text-violet-600",
+      tip: isKo
+        ? "Return on Ad Spend = 매출 ÷ 광고비. 1x = 본전, 4x = $1 써서 $4 매출. 보통 3x 이상을 목표로 합니다."
+        : "Return on Ad Spend = Revenue ÷ Spend. 1x means break-even, 4x means $4 revenue per $1 spent. Most aim for 3x+.",
     },
   ];
 
@@ -364,7 +383,10 @@ export default function DashboardPage() {
                   <Icon className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[11px] text-gray-500">{s.label}</p>
+                  <p className="flex items-center gap-1 text-[11px] text-gray-500">
+                    {s.label}
+                    <InfoTooltip text={s.tip} />
+                  </p>
                   <p className="truncate text-lg font-bold text-gray-900">
                     {s.value}
                   </p>
@@ -379,8 +401,15 @@ export default function DashboardPage() {
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardContent className="pt-6">
-            <p className="mb-3 text-sm font-semibold text-gray-700">
+            <p className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-gray-700">
               {isKo ? "일별 지출 & ROAS" : "Daily Spend & ROAS"}
+              <InfoTooltip
+                text={
+                  isKo
+                    ? "일별로 광고비(왼쪽 축, 보라색)와 ROAS(오른쪽 축, 자주색)를 함께 보여줍니다. 광고비가 늘 때 ROAS가 같이 올라가면 잘 굴러가는 것."
+                    : "Daily spend (left axis, indigo) and ROAS (right axis, purple) together. If spend goes up and ROAS holds, the loop is healthy."
+                }
+              />
             </p>
             {hasData ? (
               <ResponsiveContainer width="100%" height={260}>
@@ -446,8 +475,15 @@ export default function DashboardPage() {
         {/* Conversion funnel */}
         <Card>
           <CardContent className="pt-6">
-            <p className="mb-3 text-sm font-semibold text-gray-700">
+            <p className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-gray-700">
               {isKo ? "전환 퍼널" : "Conversion Funnel"}
+              <InfoTooltip
+                text={
+                  isKo
+                    ? "사용자가 광고를 보고(노출) → 클릭하고 → 전환할 때까지의 깔때기. 단계 사이의 % 변환율이 작으면 그 구간이 병목."
+                    : "How users move from seeing your ad (impressions) → clicking → converting. Drops between stages show where you're losing people."
+                }
+              />
             </p>
             {totals && (
               <div className="space-y-3">
@@ -487,22 +523,49 @@ export default function DashboardPage() {
                   );
                 })}
                 <div className="mt-3 border-t border-gray-100 pt-3 text-xs text-gray-500">
-                  <div className="flex justify-between">
-                    <span>{isKo ? "노출→클릭" : "Imp→Click"}</span>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      {isKo ? "노출→클릭" : "Imp→Click"}
+                      <InfoTooltip
+                        text={
+                          isKo
+                            ? "광고를 본 사람 중 몇 %가 클릭했나? = CTR"
+                            : "What % of viewers clicked? = CTR"
+                        }
+                      />
+                    </span>
                     <span className="font-semibold text-gray-900">
                       {totals.ctr.toFixed(2)}%
                     </span>
                   </div>
-                  <div className="mt-1 flex justify-between">
-                    <span>{isKo ? "클릭→전환" : "Click→Conv"}</span>
+                  <div className="mt-1 flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      {isKo ? "클릭→전환" : "Click→Conv"}
+                      <InfoTooltip
+                        text={
+                          isKo
+                            ? "클릭한 사람 중 몇 %가 실제로 구매(또는 가입)했나? 랜딩페이지가 잘 작동하는지 보여주는 지표."
+                            : "Of people who clicked, what % actually converted? Tells you whether your landing page works."
+                        }
+                      />
+                    </span>
                     <span className="font-semibold text-gray-900">
                       {totals.clicks > 0
                         ? `${((totals.conversions / totals.clicks) * 100).toFixed(2)}%`
                         : "—"}
                     </span>
                   </div>
-                  <div className="mt-1 flex justify-between">
-                    <span>CPA</span>
+                  <div className="mt-1 flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      CPA
+                      <InfoTooltip
+                        text={
+                          isKo
+                            ? "Cost Per Acquisition = 광고비 ÷ 전환 수. 전환 1건당 든 광고비. 낮을수록 좋음."
+                            : "Cost Per Acquisition = Spend ÷ Conversions. How much you paid for each conversion. Lower is better."
+                        }
+                      />
+                    </span>
                     <span className="font-semibold text-gray-900">
                       {totals.cpa > 0 ? fmtMoney(totals.cpa) : "—"}
                     </span>
@@ -517,8 +580,15 @@ export default function DashboardPage() {
       {/* ─── Per-campaign cards with sparkline + inline action ─── */}
       {campaigns.length > 0 && (
         <div className="mt-6">
-          <h2 className="text-sm font-semibold text-gray-700">
+          <h2 className="flex items-center gap-1.5 text-sm font-semibold text-gray-700">
             {isKo ? "캠페인별 성과" : "Per-campaign performance"}
+            <InfoTooltip
+              text={
+                isKo
+                  ? "각 캠페인의 ROAS 추이(스파크라인). 초록 = 목표 ROAS 달성, 주황 = 미달. 카드 안의 일시정지/재개 버튼으로 바로 컨트롤 가능."
+                  : "Per-campaign ROAS trend (sparkline). Green = on target, amber = under. Use the inline pause/resume to control without leaving the dashboard."
+              }
+            />
           </h2>
           <div className="mt-3 grid gap-3 lg:grid-cols-2">
             {campaigns.map((c) => {
@@ -639,8 +709,15 @@ export default function DashboardPage() {
       {/* ─── Optimization activity feed ─── */}
       <div className="mt-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gray-700">
+          <h2 className="flex items-center gap-1.5 text-sm font-semibold text-gray-700">
             {isKo ? "자동 최적화 활동" : "Auto-optimization activity"}
+            <InfoTooltip
+              text={
+                isKo
+                  ? "1시간마다 cron이 모든 캠페인을 검사해서 ROAS가 목표 미달이면 일시정지하거나 예산을 줄이고, 잘 되면 예산을 늘립니다. 여기서 그 이력을 볼 수 있어요."
+                  : "Every hour the cron checks every campaign — pausing or shrinking budgets when ROAS is under target, scaling winners up. This is the audit log of those actions."
+              }
+            />
           </h2>
           <span className="text-xs text-gray-400">
             {isKo ? "1시간마다 실행" : "runs hourly"}
