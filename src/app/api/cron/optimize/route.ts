@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase/admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { prisma } from "@/lib/prisma";
 import {
   getMetaCampaignDailyMetrics,
   updateAdStatus,
@@ -10,26 +9,11 @@ import { decide, type OptimizerAction } from "@/lib/services/optimizer";
 
 // Hourly cron — auto-optimizes every campaign with optimizationEnabled=true.
 //
-// Auth: requires `Authorization: Bearer ${CRON_SECRET}` (Vercel cron sets
-// this when configured via vercel.json).
+// Auth: requires `Authorization: Bearer ${CRON_SECRET}` (systemd timer or
+// Vercel cron sets this header when invoking the route).
 //
-// Decisions are written to `optimizationLogs` so users can audit what the
-// loop did and why.
-
-interface CampaignDoc {
-  id: string;
-  ownerId: string;
-  name: string;
-  status: string;
-  platform: string;
-  platformCampaignId?: string;
-  platformAdSetId?: string;
-  platformAdId?: string;
-  targetRoas?: number | null;
-  optimizationEnabled?: boolean;
-  budget?: { amount: number; currency: string; type: string };
-  originalDailyBudget?: number;
-}
+// Decisions are written to the OptimizationLog table so users can audit
+// what the loop did and why.
 
 export async function GET(request: NextRequest) {
   const auth = request.headers.get("authorization");
@@ -48,37 +32,37 @@ export async function GET(request: NextRequest) {
   };
 
   try {
-    const snap = await adminDb
-      .collection("campaigns")
-      .where("platform", "==", "meta")
-      .where("optimizationEnabled", "==", true)
-      .get();
+    const campaigns = await prisma.campaign.findMany({
+      where: {
+        platform: "meta",
+        optimizationEnabled: true,
+      },
+    });
 
-    // Cache user Meta tokens to avoid re-fetching the user doc per campaign.
-    const tokenCache = new Map<string, { accessToken: string } | null>();
+    // Cache user Meta tokens to avoid re-fetching the user row per campaign.
+    const tokenCache = new Map<string, string | null>();
 
-    for (const doc of snap.docs) {
-      const c = { id: doc.id, ...(doc.data() as Omit<CampaignDoc, "id">) };
+    for (const c of campaigns) {
       summary.examined++;
 
       if (!c.platformCampaignId || !c.targetRoas) continue;
       if (c.status === "archived") continue;
 
-      // Resolve user's Meta token (cached)
-      let meta: { accessToken: string } | null;
-      if (tokenCache.has(c.ownerId)) {
-        meta = tokenCache.get(c.ownerId) ?? null;
-      } else {
-        const userSnap = await adminDb.doc(`users/${c.ownerId}`).get();
-        meta = userSnap.data()?.integrations?.meta || null;
-        tokenCache.set(c.ownerId, meta);
+      let accessToken = tokenCache.get(c.ownerId);
+      if (accessToken === undefined) {
+        const u = await prisma.user.findUnique({
+          where: { id: c.ownerId },
+          select: { metaAccessToken: true },
+        });
+        accessToken = u?.metaAccessToken ?? null;
+        tokenCache.set(c.ownerId, accessToken);
       }
-      if (!meta?.accessToken) continue;
+      if (!accessToken) continue;
 
       try {
         const series = await getMetaCampaignDailyMetrics(
           c.platformCampaignId,
-          meta.accessToken,
+          accessToken,
           3
         );
         const totals = series.reduce(
@@ -90,7 +74,7 @@ export async function GET(request: NextRequest) {
         );
         const recentRoas = totals.spend > 0 ? totals.value / totals.spend : 0;
 
-        const currentDaily = c.budget?.amount ?? 0;
+        const currentDaily = c.budgetAmount;
         const originalDaily = c.originalDailyBudget ?? currentDaily;
 
         const action: OptimizerAction = decide({
@@ -104,28 +88,25 @@ export async function GET(request: NextRequest) {
         });
 
         if (action.kind === "noop") {
-          await adminDb.collection("optimizationLogs").add({
-            campaignDocId: c.id,
-            ownerId: c.ownerId,
-            kind: "noop",
-            reason: action.reason,
-            recentRoas,
-            recentSpend: totals.spend,
-            targetRoas: c.targetRoas,
-            createdAt: FieldValue.serverTimestamp(),
+          await prisma.optimizationLog.create({
+            data: {
+              campaignDocId: c.id,
+              ownerId: c.ownerId,
+              kind: "noop",
+              reason: action.reason,
+              recentRoas,
+              recentSpend: totals.spend,
+              targetRoas: c.targetRoas,
+            },
           });
           continue;
         }
 
         if (action.kind === "pause") {
-          await updateAdStatus(
-            c.platformCampaignId,
-            meta.accessToken,
-            "PAUSED"
-          );
-          await doc.ref.update({
-            status: "paused",
-            updatedAt: FieldValue.serverTimestamp(),
+          await updateAdStatus(c.platformCampaignId, accessToken, "PAUSED");
+          await prisma.campaign.update({
+            where: { id: c.id },
+            data: { status: "paused" },
           });
           summary.paused++;
           summary.actions++;
@@ -133,51 +114,55 @@ export async function GET(request: NextRequest) {
 
         if (action.kind === "scale_budget") {
           if (!c.platformAdSetId) {
-            // Can't scale without an ad-set ID — log and skip
-            await adminDb.collection("optimizationLogs").add({
-              campaignDocId: c.id,
-              ownerId: c.ownerId,
-              kind: "skip",
-              reason: "missing_adset_id",
-              createdAt: FieldValue.serverTimestamp(),
+            await prisma.optimizationLog.create({
+              data: {
+                campaignDocId: c.id,
+                ownerId: c.ownerId,
+                kind: "skip",
+                reason: "missing_adset_id",
+              },
             });
             continue;
           }
           await updateAdSetDailyBudget(
             c.platformAdSetId,
-            meta.accessToken,
+            accessToken,
             action.nextDailyBudget
           );
-          await doc.ref.update({
-            "budget.amount": action.nextDailyBudget,
-            originalDailyBudget: originalDaily, // freeze original on first move
-            updatedAt: FieldValue.serverTimestamp(),
+          await prisma.campaign.update({
+            where: { id: c.id },
+            data: {
+              budgetAmount: action.nextDailyBudget,
+              originalDailyBudget: originalDaily, // freeze on first move
+            },
           });
           summary.scaled++;
           summary.actions++;
         }
 
-        await adminDb.collection("optimizationLogs").add({
-          campaignDocId: c.id,
-          ownerId: c.ownerId,
-          kind: action.kind,
-          reason: action.reason,
-          recentRoas,
-          recentSpend: totals.spend,
-          targetRoas: c.targetRoas,
-          ...(action.kind === "scale_budget"
-            ? { nextDailyBudget: action.nextDailyBudget }
-            : {}),
-          createdAt: FieldValue.serverTimestamp(),
+        await prisma.optimizationLog.create({
+          data: {
+            campaignDocId: c.id,
+            ownerId: c.ownerId,
+            kind: action.kind,
+            reason: action.reason,
+            recentRoas,
+            recentSpend: totals.spend,
+            targetRoas: c.targetRoas,
+            ...(action.kind === "scale_budget"
+              ? { nextDailyBudget: action.nextDailyBudget }
+              : {}),
+          },
         });
       } catch (err) {
         summary.errors++;
-        await adminDb.collection("optimizationLogs").add({
-          campaignDocId: c.id,
-          ownerId: c.ownerId,
-          kind: "error",
-          reason: err instanceof Error ? err.message : "unknown",
-          createdAt: FieldValue.serverTimestamp(),
+        await prisma.optimizationLog.create({
+          data: {
+            campaignDocId: c.id,
+            ownerId: c.ownerId,
+            kind: "error",
+            reason: err instanceof Error ? err.message : "unknown",
+          },
         });
       }
     }

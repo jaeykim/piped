@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase/admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { adminAuth } from "@/lib/firebase/admin";
+import { prisma } from "@/lib/prisma";
 import { nanoid } from "nanoid";
 
 export async function POST(request: NextRequest) {
@@ -15,63 +15,45 @@ export async function POST(request: NextRequest) {
 
     const { programId } = await request.json();
 
-    // Check program exists and is active
-    const programSnap = await adminDb
-      .doc(`affiliatePrograms/${programId}`)
-      .get();
-    if (!programSnap.exists || programSnap.data()?.status !== "active") {
+    const program = await prisma.affiliateProgram.findUnique({
+      where: { id: programId },
+      include: { project: { select: { url: true } } },
+    });
+    if (!program || program.status !== "active") {
       return NextResponse.json(
         { error: "Program not found or inactive" },
         { status: 404 }
       );
     }
 
-    // Check if already joined
-    const existingLinks = await adminDb
-      .collection("affiliateLinks")
-      .where("programId", "==", programId)
-      .where("influencerId", "==", uid)
-      .get();
-
-    if (!existingLinks.empty) {
-      const existingLink = existingLinks.docs[0];
+    const existing = await prisma.affiliateLink.findFirst({
+      where: { programId, influencerId: uid },
+    });
+    if (existing) {
       return NextResponse.json({
         success: true,
-        linkId: existingLink.id,
-        code: existingLink.data().code,
+        linkId: existing.id,
+        code: existing.code,
         alreadyJoined: true,
       });
     }
 
-    // Get destination URL from the project
-    const projectId = programSnap.data()!.projectId;
-    const projectSnap = await adminDb.doc(`projects/${projectId}`).get();
-    const destinationUrl = projectSnap.data()?.url || "";
-
-    // Create affiliate link
     const code = nanoid(8);
-    const linkRef = await adminDb.collection("affiliateLinks").add({
-      programId,
-      influencerId: uid,
-      code,
-      destinationUrl,
-      clicks: 0,
-      conversions: 0,
-      earnings: 0,
-      createdAt: FieldValue.serverTimestamp(),
+    const link = await prisma.affiliateLink.create({
+      data: {
+        programId,
+        influencerId: uid,
+        code,
+        destinationUrl: program.project?.url || "",
+      },
     });
 
-    // Increment affiliate count
-    await adminDb.doc(`affiliatePrograms/${programId}`).update({
-      totalAffiliates: FieldValue.increment(1),
-      updatedAt: FieldValue.serverTimestamp(),
+    await prisma.affiliateProgram.update({
+      where: { id: programId },
+      data: { totalAffiliates: { increment: 1 } },
     });
 
-    return NextResponse.json({
-      success: true,
-      linkId: linkRef.id,
-      code,
-    });
+    return NextResponse.json({ success: true, linkId: link.id, code });
   } catch (error) {
     console.error("Error joining program:", error);
     return NextResponse.json(

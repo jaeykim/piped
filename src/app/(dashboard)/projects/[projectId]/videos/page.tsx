@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
-import { getDb, getAuth_ } from "@/lib/firebase/client";
+import { getAuth_ } from "@/lib/firebase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,10 +31,14 @@ export default function VideosPage() {
 
   const loadCreatives = useCallback(async () => {
     try {
-      const snap = await getDocs(
-        query(collection(getDb(), "projects", projectId, "creatives"), orderBy("createdAt", "desc"))
-      );
-      setCreatives(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Creative));
+      const token = await getAuth_().currentUser?.getIdToken();
+      const res = await fetch(`/api/projects/${projectId}?include=creatives`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const { project } = await res.json();
+        setCreatives((project?.creatives ?? []) as Creative[]);
+      }
     } catch (e) {
       console.error("Failed to load creatives:", e);
     }

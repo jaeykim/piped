@@ -2,20 +2,11 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import {
-  collection,
-  getDocs,
-  doc,
-  updateDoc,
-  query,
-  orderBy,
-} from "firebase/firestore";
-import { getDb, getAuth_ } from "@/lib/firebase/client";
+import { getAuth_ } from "@/lib/firebase/client";
 import { useAuth } from "@/context/auth-context";
 import { useLocale } from "@/context/locale-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Tabs } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
@@ -23,14 +14,12 @@ import Link from "next/link";
 import {
   Sparkles,
   Copy,
-  Heart,
-  Edit3,
   Check,
   X,
   RefreshCw,
   ArrowRight,
-  CheckCircle,
   Image as ImageIcon,
+  ChevronDown,
 } from "lucide-react";
 import type { CopyVariant, CopyType } from "@/types/copy";
 
@@ -47,162 +36,7 @@ const LANGUAGES = [
   { code: "th", label: "ไทย", flag: "🇹🇭" },
 ];
 
-const COUNTRIES = [
-  { code: "KR", label: "대한민국", flag: "🇰🇷" },
-  { code: "US", label: "미국", flag: "🇺🇸" },
-  { code: "JP", label: "일본", flag: "🇯🇵" },
-  { code: "CN", label: "중국", flag: "🇨🇳" },
-  { code: "GB", label: "영국", flag: "🇬🇧" },
-  { code: "DE", label: "독일", flag: "🇩🇪" },
-  { code: "FR", label: "프랑스", flag: "🇫🇷" },
-  { code: "BR", label: "브라질", flag: "🇧🇷" },
-  { code: "IN", label: "인도", flag: "🇮🇳" },
-  { code: "VN", label: "베트남", flag: "🇻🇳" },
-  { code: "TH", label: "태국", flag: "🇹🇭" },
-  { code: "GLOBAL", label: "글로벌 (전체)", flag: "🌏" },
-];
-
-
-function CopyCard({
-  variant,
-  projectId,
-  onUpdate,
-}: {
-  variant: CopyVariant;
-  projectId: string;
-  onUpdate: () => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [editText, setEditText] = useState(
-    variant.editedContent || variant.content
-  );
-  const [copied, setCopied] = useState(false);
-  const { toast } = useToast();
-  const { t } = useLocale();
-
-  const isAdCopy = variant.type === "ad_meta" || variant.type === "ad_google";
-  const displayContent = variant.editedContent || variant.content;
-  let adData: Record<string, string> | null = null;
-
-  if (isAdCopy) {
-    try {
-      adData = JSON.parse(displayContent);
-    } catch {
-      // Not JSON, display as-is
-    }
-  }
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(displayContent);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleFavorite = async () => {
-    await updateDoc(
-      doc(getDb(), "projects", projectId, "copyVariants", variant.id),
-      { isFavorited: !variant.isFavorited }
-    );
-    onUpdate();
-  };
-
-  const handleSaveEdit = async () => {
-    await updateDoc(
-      doc(getDb(), "projects", projectId, "copyVariants", variant.id),
-      { editedContent: editText, isEdited: true }
-    );
-    setEditing(false);
-    onUpdate();
-    toast("success", t.copy.copyUpdated);
-  };
-
-  return (
-    <Card className="group">
-      <CardContent>
-        {editing ? (
-          <div className="space-y-3">
-            <textarea
-              value={editText}
-              onChange={(e) => setEditText(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 p-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              rows={4}
-            />
-            <div className="flex gap-2">
-              <Button size="sm" onClick={handleSaveEdit}>
-                <Check className="mr-1 h-3 w-3" />
-                {t.copy.save}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setEditing(false)}
-              >
-                <X className="mr-1 h-3 w-3" />
-                {t.copy.cancel}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <>
-            {adData ? (
-              <div className="space-y-2 text-sm">
-                {Object.entries(adData).map(([key, value]) => (
-                  <div key={key}>
-                    <span className="font-medium text-gray-500">{key}: </span>
-                    <span className="text-gray-900">{value}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-900 whitespace-pre-wrap">
-                {displayContent}
-              </p>
-            )}
-            {variant.isEdited && (
-              <Badge variant="info" className="mt-2">
-                {t.copy.edited}
-              </Badge>
-            )}
-            <div className="mt-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button
-                onClick={handleCopy}
-                className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                title="Copy"
-              >
-                {copied ? (
-                  <Check className="h-4 w-4 text-green-500" />
-                ) : (
-                  <Copy className="h-4 w-4" />
-                )}
-              </button>
-              <button
-                onClick={handleFavorite}
-                className={`rounded p-1.5 hover:bg-gray-100 ${
-                  variant.isFavorited
-                    ? "text-red-500"
-                    : "text-gray-400 hover:text-gray-600"
-                }`}
-                title="Favorite"
-              >
-                <Heart
-                  className="h-4 w-4"
-                  fill={variant.isFavorited ? "currentColor" : "none"}
-                />
-              </button>
-              <button
-                onClick={() => setEditing(true)}
-                className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                title="Edit"
-              >
-                <Edit3 className="h-4 w-4" />
-              </button>
-            </div>
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
+const TYPE_ORDER: CopyType[] = ["headline", "description_short", "ad_meta", "ad_google", "cta", "social", "description_long"];
 
 export default function CopyPage() {
   const params = useParams();
@@ -210,11 +44,18 @@ export default function CopyPage() {
   const [variants, setVariants] = useState<CopyVariant[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState("ko");
-  const [selectedCountry, setSelectedCountry] = useState("KR");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const { toast } = useToast();
   const { refreshProfile } = useAuth();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const isKo = locale.startsWith("ko");
+
+  // Auto-detect language from locale
+  const defaultLang = LANGUAGES.find((l) => locale.startsWith(l.code))?.code || "ko";
+  const [selectedLanguage, setSelectedLanguage] = useState(defaultLang);
+  const [showLangPicker, setShowLangPicker] = useState(false);
 
   const typeLabels: Record<CopyType, string> = {
     headline: t.copy.headlines,
@@ -227,14 +68,14 @@ export default function CopyPage() {
   };
 
   const loadVariants = useCallback(async () => {
-    const q = query(
-      collection(getDb(), "projects", projectId, "copyVariants"),
-      orderBy("createdAt", "desc")
-    );
-    const snap = await getDocs(q);
-    setVariants(
-      snap.docs.map((d) => ({ id: d.id, ...d.data() }) as CopyVariant)
-    );
+    const token = await getAuth_().currentUser?.getIdToken();
+    const res = await fetch(`/api/projects/${projectId}?include=copy`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      const { project } = await res.json();
+      setVariants((project?.copyVariants ?? []) as CopyVariant[]);
+    }
     setLoading(false);
   }, [projectId]);
 
@@ -247,7 +88,6 @@ export default function CopyPage() {
     try {
       const token = await getAuth_().currentUser?.getIdToken();
       const langLabel = LANGUAGES.find((l) => l.code === selectedLanguage)?.label;
-      const countryLabel = COUNTRIES.find((c) => c.code === selectedCountry)?.label;
       const res = await fetch("/api/copy/generate", {
         method: "POST",
         headers: {
@@ -257,7 +97,7 @@ export default function CopyPage() {
         body: JSON.stringify({
           projectId,
           language: langLabel,
-          country: countryLabel,
+          country: selectedLanguage === "ko" ? "대한민국" : selectedLanguage === "ja" ? "日本" : selectedLanguage === "zh" ? "中国" : "Global",
         }),
       });
       if (!res.ok) {
@@ -266,16 +106,36 @@ export default function CopyPage() {
       }
       toast("success", t.copy.generated);
       await loadVariants();
-      refreshProfile(); // Update credit balance
+      refreshProfile();
     } catch (error) {
-      toast(
-        "error",
-        error instanceof Error ? error.message : t.common.error
-      );
+      toast("error", error instanceof Error ? error.message : t.common.error);
     } finally {
       setGenerating(false);
     }
   };
+
+  const handleCopy = (id: string, content: string) => {
+    navigator.clipboard.writeText(content);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleSaveEdit = async (variantId: string) => {
+    const token = await getAuth_().currentUser?.getIdToken();
+    await fetch(`/api/copy/${variantId}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ editedContent: editText }),
+    });
+    setEditingId(null);
+    loadVariants();
+    toast("success", t.copy.copyUpdated);
+  };
+
+  const langInfo = LANGUAGES.find((l) => l.code === selectedLanguage);
 
   if (loading) {
     return (
@@ -285,66 +145,60 @@ export default function CopyPage() {
     );
   }
 
-  // ─── No variants: show language/country selector → auto generate ───
+  // ─── No variants: simple generate button ───
   if (variants.length === 0 && !generating) {
     return (
-      <div className="mx-auto max-w-4xl">
+      <div className="mx-auto max-w-2xl">
         <h1 className="text-2xl font-bold text-gray-900">{t.copy.title}</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          {t.copy.subtitle}
-        </p>
+        <p className="mt-1 text-sm text-gray-500">{isKo ? "AI가 광고 문구를 자동으로 생성합니다" : "AI generates ad copy automatically"}</p>
 
-        {/* Target Country */}
-        <div className="mt-8">
-          <h2 className="text-sm font-medium text-gray-700">{t.copy.selectCountry}</h2>
-          <div className="mt-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
-            {COUNTRIES.map((c) => (
-              <button
-                key={c.code}
-                onClick={() => setSelectedCountry(c.code)}
-                className={`flex items-center gap-2.5 rounded-lg border-2 px-3 py-2.5 text-left text-sm transition-all ${
-                  selectedCountry === c.code
-                    ? "border-indigo-500 bg-indigo-50"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                <span className="text-lg">{c.flag}</span>
-                <span className="font-medium text-gray-900">{c.label}</span>
-                {selectedCountry === c.code && (
-                  <CheckCircle className="ml-auto h-4 w-4 text-indigo-500" />
+        <Card className="mt-8">
+          <CardContent className="py-10 text-center">
+            <Sparkles className="mx-auto h-10 w-10 text-indigo-400" />
+            <p className="mt-4 text-lg font-medium text-gray-900">
+              {isKo ? "광고 문구 생성" : "Generate Ad Copy"}
+            </p>
+            <p className="mt-1 text-sm text-gray-500">
+              {isKo ? "헤드라인, 설명, 광고 카피, CTA를 한번에 만들어줍니다" : "Headlines, descriptions, ad copy, and CTAs — all at once"}
+            </p>
+
+            {/* Language selector — compact inline */}
+            <div className="mt-6 flex items-center justify-center gap-2">
+              <span className="text-sm text-gray-500">{isKo ? "언어:" : "Language:"}</span>
+              <div className="relative">
+                <button
+                  onClick={() => setShowLangPicker(!showLangPicker)}
+                  className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm hover:border-gray-300"
+                >
+                  <span>{langInfo?.flag}</span>
+                  <span className="font-medium">{langInfo?.label}</span>
+                  <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
+                </button>
+                {showLangPicker && (
+                  <div className="absolute top-full left-0 z-10 mt-1 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                    {LANGUAGES.map((l) => (
+                      <button
+                        key={l.code}
+                        onClick={() => { setSelectedLanguage(l.code); setShowLangPicker(false); }}
+                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-50 ${
+                          selectedLanguage === l.code ? "bg-indigo-50 text-indigo-700" : ""
+                        }`}
+                      >
+                        <span>{l.flag}</span>
+                        <span>{l.label}</span>
+                      </button>
+                    ))}
+                  </div>
                 )}
-              </button>
-            ))}
-          </div>
-        </div>
+              </div>
+            </div>
 
-        {/* Language */}
-        <div className="mt-8">
-          <h2 className="text-sm font-medium text-gray-700">{t.copy.selectLanguage}</h2>
-          <div className="mt-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
-            {LANGUAGES.map((l) => (
-              <button
-                key={l.code}
-                onClick={() => setSelectedLanguage(l.code)}
-                className={`flex items-center gap-2 rounded-lg border-2 px-3 py-2 text-sm transition-all ${
-                  selectedLanguage === l.code
-                    ? "border-indigo-500 bg-indigo-50"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                <span>{l.flag}</span>
-                <span className="font-medium text-gray-900">{l.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-8 flex justify-end">
-          <Button onClick={handleGenerate} size="lg">
-            <Sparkles className="mr-2 h-4 w-4" />
-            {t.copy.generateButton} (10 {t.common.credits})
-          </Button>
-        </div>
+            <Button onClick={handleGenerate} size="lg" className="mt-6">
+              <Sparkles className="mr-2 h-4 w-4" />
+              {t.copy.generateButton} (10 {t.common.credits})
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -357,69 +211,111 @@ export default function CopyPage() {
         <Card className="mt-8">
           <CardContent className="py-16 text-center">
             <Spinner size="lg" />
-            <p className="mt-4 text-lg font-medium text-gray-900">
-              {t.copy.generating}
-            </p>
-            <p className="mt-1 text-sm text-gray-500">
-              {t.copy.generatingDesc}
-            </p>
-            <div className="mt-6 space-y-2">
-              {[t.copy.generatingHeadlines, t.copy.generatingDescs, t.copy.generatingAdCopy, t.copy.generatingSocial].map(
-                (step, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-center gap-2 text-sm text-gray-500"
-                  >
-                    <div className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse" />
-                    {step}
-                  </div>
-                )
-              )}
-            </div>
+            <p className="mt-4 text-lg font-medium text-gray-900">{t.copy.generating}</p>
+            <p className="mt-1 text-sm text-gray-500">{t.copy.generatingDesc}</p>
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  // ─── Results ───
-  const types = Object.keys(typeLabels) as CopyType[];
-  const tabs = types
-    .filter((type) => variants.some((v) => v.type === type))
-    .map((type) => ({
-      id: type,
-      label: `${typeLabels[type]} (${variants.filter((v) => v.type === type).length})`,
-      content: (
-        <div className="space-y-3">
-          {variants
-            .filter((v) => v.type === type)
-            .map((v) => (
-              <CopyCard
-                key={v.id}
-                variant={v}
-                projectId={projectId}
-                onUpdate={loadVariants}
-              />
-            ))}
-        </div>
-      ),
-    }));
+  // ─── Results — flat card list grouped by type ───
+  const sortedVariants = [...variants].sort((a, b) => {
+    const ai = TYPE_ORDER.indexOf(a.type);
+    const bi = TYPE_ORDER.indexOf(b.type);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  });
+
+  // Group by type
+  let lastType: CopyType | null = null;
 
   return (
     <div className="mx-auto max-w-3xl">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">{t.copy.title}</h1>
-        <Button
-          variant="outline"
-          onClick={handleGenerate}
-          loading={generating}
-        >
-          <RefreshCw className="mr-2 h-4 w-4" />
-          {t.copy.regenerateAll}
+        <Button variant="outline" onClick={handleGenerate} loading={generating} size="sm">
+          <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+          {isKo ? "다시 생성" : "Regenerate"}
         </Button>
       </div>
-      <div className="mt-6">
-        <Tabs tabs={tabs} />
+
+      <div className="mt-6 space-y-2">
+        {sortedVariants.map((v) => {
+          const displayContent = v.editedContent || v.content;
+          const isAd = v.type === "ad_meta" || v.type === "ad_google";
+          let adData: Record<string, string> | null = null;
+          if (isAd) { try { adData = JSON.parse(displayContent); } catch {} }
+
+          // Section header when type changes
+          const showHeader = v.type !== lastType;
+          lastType = v.type;
+
+          return (
+            <div key={v.id}>
+              {showHeader && (
+                <p className="pt-4 pb-1 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                  {typeLabels[v.type]}
+                </p>
+              )}
+              <Card className="group">
+                <CardContent className="flex items-start gap-3 py-3">
+                  {editingId === v.id ? (
+                    <div className="flex-1 space-y-2">
+                      <textarea
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        className="w-full rounded-lg border border-gray-300 p-2.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        rows={3}
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={() => handleSaveEdit(v.id)}>
+                          <Check className="mr-1 h-3 w-3" />{isKo ? "저장" : "Save"}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
+                          <X className="mr-1 h-3 w-3" />{isKo ? "취소" : "Cancel"}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div
+                        className="flex-1 cursor-pointer"
+                        onClick={() => { setEditingId(v.id); setEditText(displayContent); }}
+                      >
+                        {adData ? (
+                          <div className="space-y-1 text-sm">
+                            {Object.entries(adData).map(([key, value]) => (
+                              <div key={key}>
+                                <span className="font-medium text-gray-400 text-xs">{key}: </span>
+                                <span className="text-gray-900">{value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-900 whitespace-pre-wrap">{displayContent}</p>
+                        )}
+                        {v.isEdited && (
+                          <Badge variant="info" className="mt-1 text-[10px]">{isKo ? "수정됨" : "Edited"}</Badge>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => handleCopy(v.id, displayContent)}
+                        className="shrink-0 rounded p-1.5 text-gray-300 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                      >
+                        {copiedId === v.id ? (
+                          <Check className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
+                      </button>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          );
+        })}
       </div>
 
       {/* Next Step */}
@@ -429,12 +325,8 @@ export default function CopyPage() {
             <ImageIcon className="h-5 w-5 text-indigo-600" />
           </div>
           <div>
-            <p className="font-medium text-gray-900">
-              {t.copy.nextCreatives}
-            </p>
-            <p className="text-sm text-gray-500">
-              {t.copy.nextCreativesDesc}
-            </p>
+            <p className="font-medium text-gray-900">{t.copy.nextCreatives}</p>
+            <p className="text-sm text-gray-500">{t.copy.nextCreativesDesc}</p>
           </div>
         </div>
         <Link href={`/projects/${projectId}/creatives`}>

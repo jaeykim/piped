@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase/admin";
+import { adminAuth } from "@/lib/firebase/admin";
+import { prisma } from "@/lib/prisma";
 import { createMetaCampaign } from "@/lib/services/meta-ads";
-import { FieldValue } from "firebase-admin/firestore";
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,36 +29,31 @@ export async function POST(request: NextRequest) {
       optimizationEnabled,
     } = body;
 
-    // Get user's Meta integration
-    const userSnap = await adminDb.doc(`users/${uid}`).get();
-    const userData = userSnap.data();
-    const metaIntegration = userData?.integrations?.meta;
-
-    if (!metaIntegration?.accessToken) {
+    const user = await prisma.user.findUnique({ where: { id: uid } });
+    if (!user?.metaAccessToken || !user.metaAdAccountId) {
       return NextResponse.json(
         { error: "Meta Ads account not connected" },
         { status: 400 }
       );
     }
 
-    const objectiveMap: Record<string, string> = {
+    const objectiveMap: Record<string, "OUTCOME_TRAFFIC" | "OUTCOME_AWARENESS" | "OUTCOME_SALES"> = {
       traffic: "OUTCOME_TRAFFIC",
       awareness: "OUTCOME_AWARENESS",
       conversions: "OUTCOME_SALES",
     };
 
-    // Create campaign on Meta
     const result = await createMetaCampaign({
-      accessToken: metaIntegration.accessToken,
-      adAccountId: metaIntegration.adAccountId,
+      accessToken: user.metaAccessToken,
+      adAccountId: user.metaAdAccountId,
       name,
-      objective: objectiveMap[objective] as "OUTCOME_TRAFFIC",
+      objective: objectiveMap[objective] ?? "OUTCOME_TRAFFIC",
       dailyBudget,
       targeting: {
-        ageMin: targeting.ageMin || 18,
-        ageMax: targeting.ageMax || 65,
-        genders: targeting.genders || [],
-        geoLocations: { countries: targeting.locations || ["US"] },
+        ageMin: targeting?.ageMin ?? 18,
+        ageMax: targeting?.ageMax ?? 65,
+        genders: targeting?.genders ?? [],
+        geoLocations: { countries: targeting?.locations ?? ["US"] },
       },
       adCreativeUrl: creativeUrl,
       primaryText,
@@ -67,30 +62,33 @@ export async function POST(request: NextRequest) {
       destinationUrl,
     });
 
-    // Save campaign to Firestore
-    const campaignRef = await adminDb.collection("campaigns").add({
-      projectId,
-      ownerId: uid,
-      platform: "meta",
-      platformCampaignId: result.campaignId,
-      platformAdSetId: result.adSetId,
-      platformAdId: result.adId,
-      name,
-      status: "paused",
-      objective,
-      budget: { amount: dailyBudget, currency: "USD", type: "daily" },
-      targeting,
-      targetRoas: typeof targetRoas === "number" ? targetRoas : null,
-      optimizationEnabled: !!optimizationEnabled,
-      selectedCopyIds: [],
-      selectedCreativeIds: [],
-      createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
+    const campaign = await prisma.campaign.create({
+      data: {
+        projectId: projectId ?? null,
+        ownerId: uid,
+        platform: "meta",
+        platformCampaignId: result.campaignId,
+        platformAdSetId: result.adSetId,
+        platformAdId: result.adId,
+        name,
+        status: "paused",
+        objective: objective ?? "traffic",
+        budgetAmount: dailyBudget,
+        budgetCurrency: "USD",
+        budgetType: "daily",
+        ageMin: targeting?.ageMin ?? 18,
+        ageMax: targeting?.ageMax ?? 65,
+        genders: (targeting?.genders ?? []).map(String),
+        locations: (targeting?.locations ?? []).map(String),
+        interests: (targeting?.interests ?? []).map(String),
+        targetRoas: typeof targetRoas === "number" ? targetRoas : null,
+        optimizationEnabled: !!optimizationEnabled,
+      },
     });
 
     return NextResponse.json({
       success: true,
-      campaignId: campaignRef.id,
+      campaignId: campaign.id,
       metaCampaignId: result.campaignId,
     });
   } catch (error) {

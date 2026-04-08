@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
-import { getDb, getAuth_ } from "@/lib/firebase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
@@ -21,25 +19,11 @@ export default function BrowseProgramsPage() {
 
   useEffect(() => {
     async function load() {
-      // Seed demo programs (also fixes ownerId on existing demos)
-      try {
-        const token = await getAuth_().currentUser?.getIdToken();
-        if (token) {
-          await fetch("/api/affiliates/seed", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${token}` },
-          });
-        }
-      } catch { /* silent */ }
-
-      // Load programs
-      const q = query(
-        collection(getDb(), "affiliatePrograms"),
-        where("status", "==", "active"),
-        orderBy("createdAt", "desc")
-      );
-      const snap = await getDocs(q);
-      setPrograms(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as AffiliateProgram));
+      const res = await fetch("/api/affiliates/programs");
+      if (res.ok) {
+        const data = await res.json();
+        setPrograms((data.programs || []) as AffiliateProgram[]);
+      }
       setLoading(false);
     }
     load();

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase/admin";
+import { adminAuth } from "@/lib/firebase/admin";
+import { prisma } from "@/lib/prisma";
 import Anthropic from "@anthropic-ai/sdk";
 import type { SiteAnalysis } from "@/types/analysis";
 
@@ -24,17 +25,34 @@ export async function POST(request: NextRequest) {
 
     const { projectId } = await request.json();
 
-    const projectSnap = await adminDb.doc(`projects/${projectId}`).get();
-    if (!projectSnap.exists || projectSnap.data()?.ownerId !== uid) {
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      include: { analysis: true },
+    });
+    if (!project || project.ownerId !== uid) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-
-    const analysisSnap = await adminDb.doc(`projects/${projectId}/analysis/result`).get();
-    if (!analysisSnap.exists) {
+    if (!project.analysis) {
       return NextResponse.json({ error: "Analysis not found" }, { status: 400 });
     }
 
-    const analysis = analysisSnap.data() as SiteAnalysis;
+    const analysis: SiteAnalysis = {
+      extractedText: project.analysis.extractedText,
+      metaTags: {
+        title: project.analysis.metaTitle,
+        description: project.analysis.metaDescription,
+      },
+      productName: project.analysis.productName,
+      valueProposition: project.analysis.valueProposition,
+      targetAudience: project.analysis.targetAudience,
+      keyFeatures: project.analysis.keyFeatures,
+      tone: project.analysis.tone,
+      industry: project.analysis.industry,
+      brandColors: project.analysis.brandColors,
+      logoUrl: project.analysis.logoUrl ?? undefined,
+      screenshots: project.analysis.screenshots,
+      analyzedAt: project.analysis.analyzedAt,
+    };
 
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
@@ -128,11 +146,9 @@ Include 3-5 competitors and 3 recommended ad angles. Be specific and actionable.
     }));
     result.sampleTemplates = sampleTemplates;
 
-    // Cache result in Firestore
-    await adminDb.doc(`projects/${projectId}/analysis/competitors`).set({
-      ...result,
-      analyzedAt: new Date().toISOString(),
-    });
+    // Caching dropped during the Postgres migration — competitor analysis
+    // is regenerated on demand. Re-add a JSONB column on SiteAnalysis if
+    // we need persistence again.
 
     return NextResponse.json(result);
   } catch (error) {

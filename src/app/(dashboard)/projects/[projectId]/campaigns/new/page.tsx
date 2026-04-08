@@ -4,8 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ClipboardCopy, Check as CheckIcon } from "lucide-react";
-import { doc, getDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
-import { getDb, getAuth_ } from "@/lib/firebase/client";
+import { getAuth_ } from "@/lib/firebase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -92,44 +91,51 @@ export default function NewCampaignPage() {
 
   useEffect(() => {
     async function load() {
-      const [projectSnap, analysisSnap, copySnap, creativeSnap] = await Promise.all([
-        getDoc(doc(getDb(), "projects", projectId)),
-        getDoc(doc(getDb(), "projects", projectId, "analysis", "result")),
-        getDocs(
-          query(
-            collection(getDb(), "projects", projectId, "copyVariants"),
-            orderBy("createdAt", "desc")
-          )
-        ),
-        getDocs(
-          query(
-            collection(getDb(), "projects", projectId, "creatives"),
-            orderBy("createdAt", "desc")
-          )
-        ),
-      ]);
-
-      // Read campaignType from project and set platform
-      if (projectSnap.exists()) {
-        const projectData = projectSnap.data();
-        if (projectData.campaignType) {
-          setPlatform(projectData.campaignType as "meta" | "google" | "influencer");
-        }
+      const token = await getAuth_().currentUser?.getIdToken();
+      const res = await fetch(
+        `/api/projects/${projectId}?include=analysis,copy,creatives`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) {
+        setLoading(false);
+        return;
       }
+      const { project } = await res.json();
 
-      if (analysisSnap.exists()) {
-        const data = analysisSnap.data() as SiteAnalysis;
+      if (project?.campaignType) {
+        setPlatform(project.campaignType as "meta" | "google" | "influencer");
+      }
+      if (project?.analysis) {
+        const a = project.analysis;
+        const data: SiteAnalysis = {
+          extractedText: a.extractedText,
+          metaTags: {
+            title: a.metaTitle,
+            description: a.metaDescription,
+            ogImage: a.ogImage ?? undefined,
+            ogTitle: a.ogTitle ?? undefined,
+            ogDescription: a.ogDescription ?? undefined,
+            keywords: a.keywords ?? undefined,
+          },
+          productName: a.productName,
+          valueProposition: a.valueProposition,
+          targetAudience: a.targetAudience,
+          keyFeatures: a.keyFeatures,
+          tone: a.tone,
+          industry: a.industry,
+          brandColors: a.brandColors,
+          logoUrl: a.logoUrl ?? undefined,
+          screenshots: a.screenshots,
+          analyzedAt: new Date(a.analyzedAt),
+        };
         setAnalysis(data);
         setCampaignName(`${data.productName} - Campaign`);
       }
-
-      setCopyVariants(
-        copySnap.docs.map((d) => ({ id: d.id, ...d.data() }) as CopyVariant)
-      );
+      setCopyVariants((project?.copyVariants ?? []) as CopyVariant[]);
       setCreatives(
-        creativeSnap.docs
-          .map((d) => ({ id: d.id, ...d.data() }) as Creative)
-          .filter((c) => c.status === "ready")
+        ((project?.creatives ?? []) as Creative[]).filter(
+          (c) => c.status === "ready"
+        )
       );
       setLoading(false);
     }

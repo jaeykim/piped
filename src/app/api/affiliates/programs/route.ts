@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase/admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { adminAuth } from "@/lib/firebase/admin";
+import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // List active programs (public)
-    const snap = await adminDb
-      .collection("affiliatePrograms")
-      .where("status", "==", "active")
-      .orderBy("createdAt", "desc")
-      .get();
-
-    const programs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const projectId = request.nextUrl.searchParams.get("projectId");
+    const programs = await prisma.affiliateProgram.findMany({
+      where: projectId ? { projectId } : { status: "active" },
+      orderBy: { createdAt: "desc" },
+    });
     return NextResponse.json({ programs });
   } catch (error) {
     console.error("Error fetching programs:", error);
@@ -42,37 +39,33 @@ export async function POST(request: NextRequest) {
       cookieDurationDays,
     } = body;
 
-    // Verify project ownership
-    const projectSnap = await adminDb.doc(`projects/${projectId}`).get();
-    if (!projectSnap.exists || projectSnap.data()?.ownerId !== uid) {
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { ownerId: true },
+    });
+    if (!project || project.ownerId !== uid) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const programRef = await adminDb.collection("affiliatePrograms").add({
-      projectId,
-      ownerId: uid,
-      name,
-      description,
-      commissionType,
-      commissionValue,
-      cookieDurationDays: cookieDurationDays || 30,
-      status: "active",
-      totalAffiliates: 0,
-      createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
+    const program = await prisma.affiliateProgram.create({
+      data: {
+        projectId,
+        ownerId: uid,
+        name,
+        description,
+        commissionType: commissionType === "percentage" ? "percentage" : "fixed",
+        commissionValue,
+        cookieDurationDays: cookieDurationDays || 30,
+        status: "active",
+      },
     });
 
-    // Update project pipeline stage
-    await adminDb.doc(`projects/${projectId}`).update({
-      pipelineStage: "affiliates",
-      status: "ready",
-      updatedAt: FieldValue.serverTimestamp(),
+    await prisma.project.update({
+      where: { id: projectId },
+      data: { pipelineStage: "affiliates", status: "ready" },
     });
 
-    return NextResponse.json({
-      success: true,
-      programId: programRef.id,
-    });
+    return NextResponse.json({ success: true, programId: program.id });
   } catch (error) {
     console.error("Error creating program:", error);
     return NextResponse.json(

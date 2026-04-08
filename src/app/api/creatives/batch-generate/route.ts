@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase/admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { adminAuth } from "@/lib/firebase/admin";
 
 export const maxDuration = 300; // 5 minutes for batch
 
@@ -72,21 +71,9 @@ export async function POST(request: NextRequest) {
       .filter((r): r is PromiseRejectedResult => r.status === "rejected")
       .map((r, i) => ({ index: i, error: r.reason?.message || "Failed" }));
 
-    // Create A/B test group if multiple successes
-    if (successes.length > 1) {
-      const abGroupId = `ab_${Date.now()}`;
-      await adminDb.collection(`projects/${projectId}/abTests`).add({
-        groupId: abGroupId,
-        creativeIds: successes.map((s) => s.id),
-        variants: batch.map((v: { concept: string; subject: string }, i: number) => ({
-          concept: v.concept,
-          subject: v.subject,
-          creativeId: successes[i]?.id || null,
-        })),
-        status: "active",
-        createdAt: FieldValue.serverTimestamp(),
-      });
-    }
+    // A/B test grouping was not surfaced in the UI; dropping the abTests
+    // collection during the Postgres migration. Re-add as a real table if
+    // we resurrect this feature.
 
     return NextResponse.json({
       total: batch.length,

@@ -302,6 +302,25 @@ export async function generateCardWithImage(
   return { data: result.toString("base64"), mimeType: "image/png" };
 }
 
+function buildGradientSvg(w: number, h: number, r: number, g: number, b: number): string {
+  return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="topG" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="rgba(0,0,0,0.75)"/>
+        <stop offset="60%" stop-color="rgba(0,0,0,0.3)"/>
+        <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+      </linearGradient>
+      <linearGradient id="botG" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="rgba(0,0,0,0)"/>
+        <stop offset="40%" stop-color="rgba(${r},${g},${b},0.5)"/>
+        <stop offset="100%" stop-color="rgba(${r},${g},${b},0.9)"/>
+      </linearGradient>
+    </defs>
+    <rect width="${w}" height="${Math.round(h * 0.55)}" fill="url(#topG)"/>
+    <rect y="${Math.round(h * 0.5)}" width="${w}" height="${Math.round(h * 0.5)}" fill="url(#botG)"/>
+  </svg>`;
+}
+
 /** Generate card with FULL-BLEED image background + gradient overlay + text */
 export async function generateCardOnImage(
   config: CardConfig,
@@ -321,22 +340,7 @@ export async function generateCardOnImage(
     .toBuffer();
 
   // Strong gradient overlay: dark at top (headline), brand color at bottom (CTA)
-  const gradientSvg = `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="topG" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="rgba(0,0,0,0.75)"/>
-        <stop offset="60%" stop-color="rgba(0,0,0,0.3)"/>
-        <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
-      </linearGradient>
-      <linearGradient id="botG" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="rgba(0,0,0,0)"/>
-        <stop offset="40%" stop-color="rgba(${r},${g},${b},0.5)"/>
-        <stop offset="100%" stop-color="rgba(${r},${g},${b},0.9)"/>
-      </linearGradient>
-    </defs>
-    <rect width="${w}" height="${Math.round(h * 0.55)}" fill="url(#topG)"/>
-    <rect y="${Math.round(h * 0.5)}" width="${w}" height="${Math.round(h * 0.5)}" fill="url(#botG)"/>
-  </svg>`;
+  const gradientSvg = buildGradientSvg(w, h, r, g, b);
   const gradientBuffer = await sharp(Buffer.from(gradientSvg)).png().toBuffer();
 
   const result = await sharp(bgImage)
@@ -348,4 +352,25 @@ export async function generateCardOnImage(
     .toBuffer();
 
   return { data: result.toString("base64"), mimeType: "image/png" };
+}
+
+/** Generate card background WITHOUT text or gradient (frontend handles both) */
+export async function generateCardOnImageNoText(
+  config: CardConfig,
+  imageBuffer: Buffer,
+): Promise<{ data: string; mimeType: string }> {
+  const [w, h] = config.size.split("x").map(Number);
+
+  const bgImage = await sharp(imageBuffer)
+    .resize(w, h, { fit: "cover" })
+    .png()
+    .toBuffer();
+
+  return { data: bgImage.toString("base64"), mimeType: "image/png" };
+}
+
+/** Generate card background only (no image, no text) */
+export async function generateGraphicCardNoText(config: CardConfig): Promise<{ data: string; mimeType: string }> {
+  const bgBuffer = await generateCardBackground(config);
+  return { data: bgBuffer.toString("base64"), mimeType: "image/png" };
 }

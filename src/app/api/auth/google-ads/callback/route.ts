@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase/admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { adminAuth } from "@/lib/firebase/admin";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
@@ -77,16 +77,12 @@ export async function GET(request: NextRequest) {
       console.error("Failed to fetch customer IDs:", e);
     }
 
-    // Save tokens to Firestore
-    await adminDb.doc(`users/${uid}`).update({
-      "integrations.google": {
-        refreshToken: tokens.refresh_token,
-        accessToken: tokens.access_token,
-        customerId,
-        expiresAt: new Date(Date.now() + tokens.expires_in * 1000),
-        connectedAt: FieldValue.serverTimestamp(),
+    await prisma.user.update({
+      where: { id: uid },
+      data: {
+        googleRefreshToken: tokens.refresh_token,
+        googleCustomerId: customerId,
       },
-      updatedAt: FieldValue.serverTimestamp(),
     });
 
     return NextResponse.redirect(`${baseUrl}/settings?google_ads=success`);

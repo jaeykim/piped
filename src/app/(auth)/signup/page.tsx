@@ -81,13 +81,18 @@ export default function SignupPage() {
           placeholder="you@example.com"
           required
         />
-        <Input
-          label={t.auth.password}
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
+        <div>
+          <Input
+            label={t.auth.password}
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          {password.length > 0 && password.length < 6 && (
+            <p className="mt-1 text-xs text-amber-600">{t.auth.passwordMin}</p>
+          )}
+        </div>
         <Button type="submit" loading={loading} className="w-full">
           {t.auth.signUp}
         </Button>

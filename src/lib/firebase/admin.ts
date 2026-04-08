@@ -5,15 +5,13 @@ import {
   getApp,
   type App,
 } from "firebase-admin/app";
-import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { getAuth, type Auth } from "firebase-admin/auth";
-import { getStorage, type Storage } from "firebase-admin/storage";
+
+// We still use Firebase Auth for ID token verification — the rest of the
+// data layer (Firestore, Storage) was migrated to Postgres + local disk.
 
 let _app: App | undefined;
-let _db: Firestore | undefined;
 let _auth: Auth | undefined;
-let _storage: Storage | undefined;
-let _settingsApplied = false;
 
 function getAdminApp(): App {
   if (!_app) {
@@ -29,40 +27,14 @@ function getAdminApp(): App {
                 "\n"
               ),
             }),
-            storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
           });
   }
   return _app;
 }
 
-function getAdminDb(): Firestore {
-  if (!_db) {
-    _db = getFirestore(getAdminApp());
-    try {
-      _db.settings({ ignoreUndefinedProperties: true });
-    } catch {
-      // settings already applied
-    }
-  }
-  return _db;
-}
-
-export const adminDb: Firestore = new Proxy({} as Firestore, {
-  get(_, prop) {
-    return Reflect.get(getAdminDb(), prop);
-  },
-});
-
 export const adminAuth: Auth = new Proxy({} as Auth, {
   get(_, prop) {
     if (!_auth) _auth = getAuth(getAdminApp());
     return Reflect.get(_auth, prop);
-  },
-});
-
-export const adminStorage: Storage = new Proxy({} as Storage, {
-  get(_, prop) {
-    if (!_storage) _storage = getStorage(getAdminApp());
-    return Reflect.get(_storage, prop);
   },
 });

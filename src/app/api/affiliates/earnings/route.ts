@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase/admin";
+import { adminAuth } from "@/lib/firebase/admin";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,56 +12,35 @@ export async function GET(request: NextRequest) {
     const decoded = await adminAuth.verifyIdToken(token);
     const uid = decoded.uid;
 
-    // Get all links for this influencer
-    const linksSnap = await adminDb
-      .collection("affiliateLinks")
-      .where("influencerId", "==", uid)
-      .get();
-
-    interface LinkData {
-      id: string;
-      earnings: number;
-      clicks: number;
-      conversions: number;
-      programId: string;
-    }
-    const links: LinkData[] = linksSnap.docs.map((d) => ({
-      id: d.id,
-      earnings: 0,
-      clicks: 0,
-      conversions: 0,
-      programId: "",
-      ...d.data(),
-    }));
-
-    // Calculate totals
-    let totalEarnings = 0;
-    let totalClicks = 0;
-    let totalConversions = 0;
-
-    links.forEach((link) => {
-      totalEarnings += link.earnings || 0;
-      totalClicks += link.clicks || 0;
-      totalConversions += link.conversions || 0;
+    const links = await prisma.affiliateLink.findMany({
+      where: { influencerId: uid },
+      include: { program: true },
     });
 
-    // Get program details for each link
-    const programIds = [...new Set(links.map((l) => l.programId))];
-    const programs: Record<string, unknown> = {};
-    for (const pid of programIds) {
-      const pSnap = await adminDb.doc(`affiliatePrograms/${pid}`).get();
-      if (pSnap.exists) {
-        programs[pid] = { id: pSnap.id, ...pSnap.data() };
-      }
-    }
+    const totals = links.reduce(
+      (acc, l) => ({
+        earnings: acc.earnings + l.earnings,
+        clicks: acc.clicks + l.clicks,
+        conversions: acc.conversions + l.conversions,
+      }),
+      { earnings: 0, clicks: 0, conversions: 0 }
+    );
 
     return NextResponse.json({
-      totalEarnings,
-      totalClicks,
-      totalConversions,
+      totalEarnings: totals.earnings,
+      totalClicks: totals.clicks,
+      totalConversions: totals.conversions,
       links: links.map((l) => ({
-        ...l,
-        program: programs[(l as { programId: string }).programId],
+        id: l.id,
+        programId: l.programId,
+        influencerId: l.influencerId,
+        code: l.code,
+        destinationUrl: l.destinationUrl,
+        clicks: l.clicks,
+        conversions: l.conversions,
+        earnings: l.earnings,
+        createdAt: l.createdAt,
+        program: l.program,
       })),
     });
   } catch (error) {

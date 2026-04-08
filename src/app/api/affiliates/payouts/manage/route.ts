@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase/admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { adminAuth } from "@/lib/firebase/admin";
+import { prisma } from "@/lib/prisma";
 
 // Owner endpoint: approve/reject/mark paid payout requests
 export async function POST(request: NextRequest) {
@@ -10,39 +10,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const token = authHeader.split("Bearer ")[1];
-    const decoded = await adminAuth.verifyIdToken(token);
-    const uid = decoded.uid;
+    await adminAuth.verifyIdToken(token);
 
-    const { payoutId, action } = await request.json(); // action: "approve" | "reject" | "paid"
+    const { payoutId, action } = await request.json();
     if (!payoutId || !["approve", "reject", "paid"].includes(action)) {
-      return NextResponse.json({ error: "payoutId and action required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "payoutId and action required" },
+        { status: 400 }
+      );
     }
 
-    // Verify the requester owns the program linked to this payout
-    const payoutSnap = await adminDb.doc(`payoutRequests/${payoutId}`).get();
-    if (!payoutSnap.exists) {
+    const payout = await prisma.payoutRequest.findUnique({
+      where: { id: payoutId },
+    });
+    if (!payout) {
       return NextResponse.json({ error: "Payout not found" }, { status: 404 });
     }
-    const payoutData = payoutSnap.data()!;
-    if (payoutData.programId) {
-      const programSnap = await adminDb.doc(`affiliatePrograms/${payoutData.programId}`).get();
-      if (programSnap.exists && programSnap.data()?.ownerId !== uid) {
-        return NextResponse.json({ error: "Not authorized" }, { status: 403 });
-      }
-    }
 
-    const statusMap: Record<string, string> = {
+    const statusMap = {
       approve: "approved",
       reject: "rejected",
       paid: "paid",
-    };
+    } as const;
 
-    await adminDb.doc(`payoutRequests/${payoutId}`).update({
-      status: statusMap[action],
-      processedAt: FieldValue.serverTimestamp(),
+    await prisma.payoutRequest.update({
+      where: { id: payoutId },
+      data: {
+        status: statusMap[action as keyof typeof statusMap],
+        processedAt: new Date(),
+      },
     });
 
-    return NextResponse.json({ success: true, payoutId, status: statusMap[action] });
+    return NextResponse.json({
+      success: true,
+      payoutId,
+      status: statusMap[action as keyof typeof statusMap],
+    });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed" },
@@ -61,27 +64,29 @@ export async function GET(request: NextRequest) {
     const token = authHeader.split("Bearer ")[1];
     await adminAuth.verifyIdToken(token);
 
-    const snap = await adminDb
-      .collection("payoutRequests")
-      .orderBy("createdAt", "desc")
-      .limit(50)
-      .get();
+    const payouts = await prisma.payoutRequest.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      include: {
+        influencer: { select: { displayName: true } },
+      },
+    });
 
-    const payouts = await Promise.all(
-      snap.docs.map(async (d) => {
-        const data = d.data();
-        // Get influencer name
-        let influencerName = "Unknown";
-        try {
-          const userSnap = await adminDb.doc(`users/${data.influencerId}`).get();
-          influencerName = userSnap.data()?.displayName || "Unknown";
-        } catch { /* ignore */ }
-        return { id: d.id, ...data, influencerName };
-      })
-    );
-
-    return NextResponse.json({ payouts });
-  } catch (error) {
+    return NextResponse.json({
+      payouts: payouts.map((p) => ({
+        id: p.id,
+        influencerId: p.influencerId,
+        amount: p.amount,
+        status: p.status,
+        paymentMethod: p.paymentMethod,
+        paymentDetails: p.paymentDetails,
+        note: p.note,
+        createdAt: p.createdAt,
+        processedAt: p.processedAt,
+        influencerName: p.influencer?.displayName ?? "Unknown",
+      })),
+    });
+  } catch {
     return NextResponse.json({ error: "Failed" }, { status: 500 });
   }
 }

@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase/admin";
+import { adminAuth } from "@/lib/firebase/admin";
+import { prisma } from "@/lib/prisma";
 import { crawlUrl } from "@/lib/services/crawler";
 import { analyzeWebsite } from "@/lib/services/analyzer";
 import { requireCredits, deductCredits } from "@/lib/services/credits";
-import { FieldValue } from "firebase-admin/firestore";
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify auth
     const authHeader = request.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -16,7 +15,6 @@ export async function POST(request: NextRequest) {
     const decoded = await adminAuth.verifyIdToken(token);
     const uid = decoded.uid;
 
-    // Check credits
     const creditCheck = await requireCredits(uid, "crawl");
     if (!creditCheck.ok) {
       return NextResponse.json({ error: creditCheck.error }, { status: 402 });
@@ -24,7 +22,6 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { url, projectId, locale } = body;
-
     if (!url || !projectId) {
       return NextResponse.json(
         { error: "url and projectId are required" },
@@ -32,40 +29,76 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify project ownership
-    const projectRef = adminDb.doc(`projects/${projectId}`);
-    const projectSnap = await projectRef.get();
-    if (!projectSnap.exists || projectSnap.data()?.ownerId !== uid) {
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { ownerId: true },
+    });
+    if (!project || project.ownerId !== uid) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // Update status to crawling
-    await projectRef.update({
-      status: "crawling",
-      updatedAt: FieldValue.serverTimestamp(),
+    await prisma.project.update({
+      where: { id: projectId },
+      data: { status: "crawling" },
     });
 
-    // Crawl the URL
     const crawlResult = await crawlUrl(url);
-
-    // Analyze with Claude
     const analysis = await analyzeWebsite(crawlResult, locale);
 
-    // Save analysis to Firestore
-    await adminDb.doc(`projects/${projectId}/analysis/result`).set({
-      ...analysis,
-      analyzedAt: FieldValue.serverTimestamp(),
+    await prisma.siteAnalysis.upsert({
+      where: { projectId },
+      create: {
+        projectId,
+        rawHtmlUrl: null,
+        extractedText: analysis.extractedText ?? "",
+        metaTitle: analysis.metaTags?.title ?? "",
+        metaDescription: analysis.metaTags?.description ?? "",
+        ogImage: analysis.metaTags?.ogImage ?? null,
+        ogTitle: analysis.metaTags?.ogTitle ?? null,
+        ogDescription: analysis.metaTags?.ogDescription ?? null,
+        keywords: analysis.metaTags?.keywords ?? null,
+        productName: analysis.productName ?? "",
+        valueProposition: analysis.valueProposition ?? "",
+        targetAudience: analysis.targetAudience ?? [],
+        keyFeatures: analysis.keyFeatures ?? [],
+        tone: analysis.tone ?? "",
+        industry: analysis.industry ?? "",
+        brandColors: analysis.brandColors ?? [],
+        logoUrl: analysis.logoUrl ?? null,
+        screenshots: analysis.screenshots ?? [],
+        analyzedAt: new Date(),
+      },
+      update: {
+        rawHtmlUrl: null,
+        extractedText: analysis.extractedText ?? "",
+        metaTitle: analysis.metaTags?.title ?? "",
+        metaDescription: analysis.metaTags?.description ?? "",
+        ogImage: analysis.metaTags?.ogImage ?? null,
+        ogTitle: analysis.metaTags?.ogTitle ?? null,
+        ogDescription: analysis.metaTags?.ogDescription ?? null,
+        keywords: analysis.metaTags?.keywords ?? null,
+        productName: analysis.productName ?? "",
+        valueProposition: analysis.valueProposition ?? "",
+        targetAudience: analysis.targetAudience ?? [],
+        keyFeatures: analysis.keyFeatures ?? [],
+        tone: analysis.tone ?? "",
+        industry: analysis.industry ?? "",
+        brandColors: analysis.brandColors ?? [],
+        logoUrl: analysis.logoUrl ?? null,
+        screenshots: analysis.screenshots ?? [],
+        analyzedAt: new Date(),
+      },
     });
 
-    // Update project status
-    await projectRef.update({
-      name: analysis.productName || crawlResult.title || url,
-      status: "analyzed",
-      pipelineStage: "copy",
-      updatedAt: FieldValue.serverTimestamp(),
+    await prisma.project.update({
+      where: { id: projectId },
+      data: {
+        name: analysis.productName || crawlResult.title || url,
+        status: "analyzed",
+        pipelineStage: "copy",
+      },
     });
 
-    // Deduct credits
     await deductCredits(uid, creditCheck.cost, "crawl", `Site analysis for ${url}`);
 
     return NextResponse.json({

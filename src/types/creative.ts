@@ -36,13 +36,6 @@ export const CREATIVE_SUBJECTS: SubjectInfo[] = [
     emoji: "🧑",
     examples: "헬로맥스, StyleSeller 스타일",
   },
-  {
-    id: "animal-mascot",
-    name: "동물 마스코트",
-    description: "귀여운 동물로 친근한 브랜드 이미지",
-    emoji: "🐾",
-    examples: "귀여운 동물 + 제품 연출",
-  },
 ];
 
 // ─── Concept: 광고의 메시지 전략 ───

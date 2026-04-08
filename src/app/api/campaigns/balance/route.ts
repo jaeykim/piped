@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase/admin";
+import { adminAuth } from "@/lib/firebase/admin";
+import { prisma } from "@/lib/prisma";
 
 const META_API_VERSION = "v21.0";
 const GOOGLE_ADS_BASE_URL = "https://googleads.googleapis.com/v19";
@@ -19,23 +20,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invalid platform" }, { status: 400 });
     }
 
-    // Get user integrations
-    const userSnap = await adminDb.doc(`users/${uid}`).get();
-    if (!userSnap.exists) {
+    const user = await prisma.user.findUnique({ where: { id: uid } });
+    if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
-    const user = userSnap.data()!;
-    const integrations = user.integrations || {};
 
     if (platform === "meta") {
-      const meta = integrations.meta;
-      if (!meta?.accessToken || !meta?.adAccountId) {
+      if (!user.metaAccessToken || !user.metaAdAccountId) {
         return NextResponse.json({ connected: false });
       }
 
       // Fetch Meta ad account info: balance, spend_cap, amount_spent
       const res = await fetch(
-        `https://graph.facebook.com/${META_API_VERSION}/act_${meta.adAccountId}?fields=balance,spend_cap,amount_spent,currency&access_token=${meta.accessToken}`
+        `https://graph.facebook.com/${META_API_VERSION}/act_${user.metaAdAccountId}?fields=balance,spend_cap,amount_spent,currency&access_token=${user.metaAccessToken}`
       );
 
       if (!res.ok) {
@@ -55,8 +52,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (platform === "google") {
-      const google = integrations.google;
-      if (!google?.refreshToken || !google?.customerId) {
+      if (!user.googleRefreshToken || !user.googleCustomerId) {
         return NextResponse.json({ connected: false });
       }
 
@@ -67,7 +63,7 @@ export async function GET(request: NextRequest) {
         body: new URLSearchParams({
           client_id: process.env.GOOGLE_CLIENT_ID || "",
           client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
-          refresh_token: google.refreshToken,
+          refresh_token: user.googleRefreshToken,
           grant_type: "refresh_token",
         }),
       });
@@ -81,7 +77,7 @@ export async function GET(request: NextRequest) {
 
       // Query account budget via Google Ads API
       const queryRes = await fetch(
-        `${GOOGLE_ADS_BASE_URL}/customers/${google.customerId}/googleAds:searchStream`,
+        `${GOOGLE_ADS_BASE_URL}/customers/${user.googleCustomerId}/googleAds:searchStream`,
         {
           method: "POST",
           headers: {

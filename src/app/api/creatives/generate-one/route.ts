@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
-import { adminAuth, adminDb } from "@/lib/firebase/admin";
+import { adminAuth } from "@/lib/firebase/admin";
+import { prisma } from "@/lib/prisma";
+import { saveImage } from "@/lib/storage";
 import { generateImage } from "@/lib/services/image-generator";
-import { generateGraphicCard, generateCardWithImage, generateCardOnImage } from "@/lib/services/card-generator";
+import { generateGraphicCard, generateCardWithImage, generateCardOnImage, generateCardOnImageNoText, generateGraphicCardNoText } from "@/lib/services/card-generator";
 import { selectCopyTrio } from "@/lib/services/copy-generator";
 import { requireCredits, deductCredits } from "@/lib/services/credits";
-import { FieldValue } from "firebase-admin/firestore";
 import type { SiteAnalysis } from "@/types/analysis";
 import type { CreativeSize, CreativePlatform, CreativeConcept } from "@/types/creative";
 import sharp from "sharp";
@@ -95,31 +96,52 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: creditCheck.error }, { status: 402 });
     }
 
-    const projectSnap = await adminDb.doc(`projects/${projectId}`).get();
-    if (!projectSnap.exists || projectSnap.data()?.ownerId !== uid) {
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      include: { analysis: true },
+    });
+    if (!project || project.ownerId !== uid) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-
-    const analysisSnap = await adminDb
-      .doc(`projects/${projectId}/analysis/result`)
-      .get();
-    if (!analysisSnap.exists) {
+    if (!project.analysis) {
       return NextResponse.json({ error: "Analysis not found" }, { status: 400 });
     }
 
-    const analysis = analysisSnap.data() as SiteAnalysis;
-    const websiteUrl = projectSnap.data()?.url;
+    // Re-shape the Prisma row into the SiteAnalysis interface the
+    // generators expect.
+    const analysis: SiteAnalysis = {
+      extractedText: project.analysis.extractedText,
+      metaTags: {
+        title: project.analysis.metaTitle,
+        description: project.analysis.metaDescription,
+        ogImage: project.analysis.ogImage ?? undefined,
+        ogTitle: project.analysis.ogTitle ?? undefined,
+        ogDescription: project.analysis.ogDescription ?? undefined,
+        keywords: project.analysis.keywords ?? undefined,
+      },
+      productName: project.analysis.productName,
+      valueProposition: project.analysis.valueProposition,
+      targetAudience: project.analysis.targetAudience,
+      keyFeatures: project.analysis.keyFeatures,
+      tone: project.analysis.tone,
+      industry: project.analysis.industry,
+      brandColors: project.analysis.brandColors,
+      logoUrl: project.analysis.logoUrl ?? undefined,
+      screenshots: project.analysis.screenshots,
+      analyzedAt: project.analysis.analyzedAt,
+    };
+    const websiteUrl = project.url;
 
     // Smart Copy Trio: auto-select best headline + subheadline + CTA (with timeout)
     let copyTrio = { headline: analysis.valueProposition || analysis.productName, subheadline: "", cta: "자세히 보기 →" };
     try {
-      const copySnap = await adminDb
-        .collection(`projects/${projectId}/copyVariants`)
-        .get();
-      if (!copySnap.empty) {
-        const variants = copySnap.docs.map((d) => ({
-          type: d.data().type as string,
-          content: (d.data().editedContent || d.data().content) as string,
+      const copyRows = await prisma.copyVariant.findMany({
+        where: { projectId },
+      });
+      if (copyRows.length > 0) {
+        const variants = copyRows.map((d) => ({
+          type: d.type as string,
+          content: d.editedContent || d.content,
         }));
         // Race with 15s timeout to prevent hanging
         const trioPromise = selectCopyTrio(variants, concept, language);
@@ -267,15 +289,15 @@ export async function POST(request: NextRequest) {
         }
 
         if (imageBuffer) {
-          // FULL-BLEED: image fills entire card, gradient overlay + text on top
-          const composited = await generateCardOnImage(cardConfig, imageBuffer);
+          // FULL-BLEED: image fills entire card, gradient overlay, NO text (frontend renders text)
+          const composited = await generateCardOnImageNoText(cardConfig, imageBuffer);
           cardData = composited.data;
         } else {
-          cardData = (await generateGraphicCard(cardConfig)).data;
+          cardData = (await generateGraphicCardNoText(cardConfig)).data;
         }
       } catch (e) {
         console.error("Screenshot mockup failed:", e);
-        cardData = (await generateGraphicCard(cardConfig)).data;
+        cardData = (await generateGraphicCardNoText(cardConfig)).data;
       }
 
       result = {
@@ -284,6 +306,7 @@ export async function POST(request: NextRequest) {
         prompt: "graphic-card",
         hookText: copyTrio.headline || finalOverlay,
       };
+      // graphic-card now returns text-free background; frontend handles text overlay
     } else {
       // AI image generation for other subjects
       result = await generateImage(analysis, {
@@ -302,34 +325,80 @@ export async function POST(request: NextRequest) {
     // Derive all formats from the single base image
     const formats = await deriveFormats(result.imageData, result.mimeType, size);
 
-    // Save primary to Firestore
-    // Note: base64 images can exceed Firestore 1MB limit, so truncate if too large
-    const imageDataUri = `data:${result.mimeType};base64,${result.imageData}`;
-    const imageUrlToStore = imageDataUri.length < 900_000 ? imageDataUri : ""; // Firestore 1MB limit
-    const ref = await adminDb
-      .collection(`projects/${projectId}/creatives`)
-      .add({
-        imageUrl: imageUrlToStore,
+    // Save image to local disk and serve via /uploads route
+    let storageUrl = "";
+    try {
+      const saved = await saveImage({
+        ownerId: uid,
+        projectId,
+        data: result.imageData,
+        extension: "png",
+      });
+      storageUrl = saved.url;
+    } catch (e) {
+      console.error("Storage upload failed:", e);
+    }
+
+    // Pick text overlay style based on concept × subject × industry
+    const industry = analysis.industry?.toLowerCase() || "";
+    let textStyle = "split-text-top";
+    if (subject === "graphic-card") {
+      if (concept === "benefit-driven" || concept === "social-proof") textStyle = "split-text-top";
+      else if (concept === "offer" || concept === "urgency") textStyle = "bold-strip";
+      else if (concept === "pain-point" || concept === "comparison") textStyle = "dark-premium";
+      else if (concept === "how-it-works" || concept === "question") textStyle = "highlight-keyword";
+      else textStyle = "split-text-top";
+    } else if (subject === "product-ui") {
+      textStyle = "dark-premium";
+    } else if (subject === "person-product") {
+      textStyle = "split-text-top";
+    }
+
+    const created = await prisma.creative.create({
+      data: {
+        projectId,
+        imageUrl: storageUrl,
         prompt: result.prompt,
         size,
         platform,
         concept,
+        subject: subject || "product-ui",
         overlayText: result.hookText,
         status: "ready",
-        createdAt: FieldValue.serverTimestamp(),
-      });
+      },
+    });
 
     // Deduct credits after successful generation
     const creditsRemaining = await deductCredits(uid, creditCheck.cost, creditAction, `Creative ${concept} ${subject}`);
 
+    // Badge for all subjects (Korean ad style decorative badges)
+    const badgeMap: Record<string, string> = {
+      "offer": "혜택",
+      "social-proof": "인기",
+      "how-it-works": "간편",
+      "before-after": "변화",
+      "comparison": "비교",
+      "urgency": "긴급",
+      "story": "후기",
+      "question": "궁금",
+      "benefit-driven": "추천",
+      "pain-point": "해결",
+    };
+
     return NextResponse.json({
-      id: ref.id,
+      id: created.id,
       baseImage: `data:${result.mimeType};base64,${result.imageData}`,
       hookText: result.hookText,
-      copyTrio,
+      copyTrio: {
+        ...copyTrio,
+        // Use Claude-generated sub text (ad-strategy methodology) if available
+        subheadline: (result as { subText?: string }).subText || copyTrio.subheadline,
+      },
       productName: analysis.productName,
       brandColor: analysis.brandColors[0] || "#4F46E5",
-      isComplete: subject === "graphic-card",
+      badge: badgeMap[concept] || "",
+      isComplete: false,
+      textStyle,
       creditsRemaining,
       size,
       platform,
@@ -342,10 +411,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const stack = error instanceof Error ? error.stack?.split("\n").slice(0, 3).join(" | ") : "";
-    console.error("Generate-one error:", message, stack);
+    console.error("Generate-one error:", message, error instanceof Error ? error.stack : "");
     return NextResponse.json(
-      { error: message, detail: stack },
+      { error: "Creative generation failed. Please try again." },
       { status: 500 }
     );
   }

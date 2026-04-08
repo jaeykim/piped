@@ -50,8 +50,23 @@ model User {
   affiliatePrograms AffiliateProgram[]
   optimizationLogs  OptimizationLog[]
   payoutRequests    PayoutRequest[]
+  creditHistory     CreditHistory[]
 
   @@index([email])
+}
+
+model CreditHistory {
+  id          String   @id @default(cuid())
+  userId      String
+  amount      Int // negative for deduction, positive for top-up
+  balance     Int // resulting balance
+  action      String
+  description String
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
 }
 
 // ─── Projects (one per analyzed product/site) ───

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase/admin";
+import { adminAuth } from "@/lib/firebase/admin";
+import { prisma } from "@/lib/prisma";
 import { createGoogleCampaign } from "@/lib/services/google-ads";
 import { refreshGoogleAccessToken } from "@/lib/services/google-auth";
-import { FieldValue } from "firebase-admin/firestore";
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,21 +25,16 @@ export async function POST(request: NextRequest) {
       targeting,
     } = body;
 
-    // Get user's Google integration
-    const userSnap = await adminDb.doc(`users/${uid}`).get();
-    const userData = userSnap.data();
-    const googleIntegration = userData?.integrations?.google;
-
-    if (!googleIntegration?.refreshToken) {
+    const user = await prisma.user.findUnique({ where: { id: uid } });
+    if (!user?.googleRefreshToken) {
       return NextResponse.json(
-        { error: "Google Ads 계정이 연결되지 않았습니다. Settings에서 연결하세요." },
+        { error: "Google Ads account not connected. Please connect in Settings." },
         { status: 400 }
       );
     }
-
-    if (!googleIntegration.customerId) {
+    if (!user.googleCustomerId) {
       return NextResponse.json(
-        { error: "Google Ads Customer ID가 없습니다. 계정을 다시 연결하세요." },
+        { error: "Google Ads Customer ID not found. Please reconnect your account." },
         { status: 400 }
       );
     }
@@ -52,13 +47,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get fresh access token from refresh token
-    const accessToken = await refreshGoogleAccessToken(
-      googleIntegration.refreshToken
-    );
+    const accessToken = await refreshGoogleAccessToken(user.googleRefreshToken);
 
     const result = await createGoogleCampaign({
-      customerId: googleIntegration.customerId,
+      customerId: user.googleCustomerId,
       accessToken,
       developerToken,
       name,
@@ -69,26 +61,29 @@ export async function POST(request: NextRequest) {
       targeting,
     });
 
-    // Save campaign to Firestore
-    const campaignRef = await adminDb.collection("campaigns").add({
-      projectId,
-      ownerId: uid,
-      platform: "google",
-      platformCampaignId: result.campaignResourceName,
-      name,
-      status: "paused",
-      objective: "traffic",
-      budget: { amount: dailyBudget, currency: "USD", type: "daily" },
-      targeting,
-      selectedCopyIds: [],
-      selectedCreativeIds: [],
-      createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
+    const campaign = await prisma.campaign.create({
+      data: {
+        projectId: projectId ?? null,
+        ownerId: uid,
+        platform: "google",
+        platformCampaignId: result.campaignResourceName,
+        name,
+        status: "paused",
+        objective: "traffic",
+        budgetAmount: dailyBudget,
+        budgetCurrency: "USD",
+        budgetType: "daily",
+        ageMin: targeting?.ageMin ?? 18,
+        ageMax: targeting?.ageMax ?? 65,
+        genders: (targeting?.genders ?? []).map(String),
+        locations: (targeting?.locations ?? []).map(String),
+        interests: (targeting?.interests ?? []).map(String),
+      },
     });
 
     return NextResponse.json({
       success: true,
-      campaignId: campaignRef.id,
+      campaignId: campaign.id,
       googleCampaignId: result.campaignResourceName,
     });
   } catch (error) {

@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
-import { collection, getDocs, doc, getDoc, query, orderBy } from "firebase/firestore";
-import { getDb, getAuth_ } from "@/lib/firebase/client";
+import { getAuth_ } from "@/lib/firebase/client";
 import { useAuth } from "@/context/auth-context";
 import { useLocale } from "@/context/locale-context";
 import { Button } from "@/components/ui/button";
@@ -90,6 +89,7 @@ interface GeneratedCreative {
   productName: string;
   brandColor: string;
   isComplete: boolean; // true = graphic card with text baked in, no overlay needed
+  textStyle?: string;
   size: string;
   platform: string;
   concept: CreativeConcept;
@@ -150,27 +150,56 @@ export default function CreativesPage() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [hasCampaigns, setHasCampaigns] = useState(false);
   const [batchResults, setBatchResults] = useState<{ id: string; baseImage: string; hookText: string; concept: string; subject: string; isComplete: boolean }[]>([]);
+  const [savedCreatives, setSavedCreatives] = useState<{ id: string; imageUrl: string; overlayText: string; concept: string; subject: string; size: string; createdAt: Date; productName: string; brandColor: string; subheadline: string; cta: string; textStyle: string }[]>([]);
 
-  // Load project settings (language/country from copy step)
+  // Load project + saved creatives in one round-trip
   useEffect(() => {
-    async function loadProjectSettings() {
-      const snap = await getDoc(doc(getDb(), "projects", projectId));
-      const data = snap.data();
-      if (data?.language) {
-        const match = LANGUAGES.find((l) => l.label === data.language);
-        if (match) setSelectedLanguage(match.code);
-      }
-      if (data?.country) {
-        const match = COUNTRIES.find((c) => c.label === data.country);
-        if (match) setSelectedCountry(match.code);
-      }
-      // Check if already past creatives stage
-      const stage = data?.pipelineStage;
+    async function loadProject() {
+      const token = await getAuth_().currentUser?.getIdToken();
+      const res = await fetch(
+        `/api/projects/${projectId}?include=creatives`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) return;
+      const { project } = await res.json();
+
+      // The new schema doesn't store language/country on the project row
+      // anymore — it's only used as a request param for /api/copy/generate.
+      // pipelineStage is still available though.
+      const stage = project?.pipelineStage;
       if (stage === "campaigns" || stage === "affiliates") {
         setHasCampaigns(true);
       }
+
+      const creatives = (project?.creatives ?? []) as Array<{
+        id: string;
+        imageUrl: string;
+        overlayText?: string;
+        concept?: string;
+        subject?: string;
+        size?: string;
+        createdAt: string;
+      }>;
+      setSavedCreatives(
+        creatives
+          .filter((c) => c.imageUrl)
+          .map((c) => ({
+            id: c.id,
+            imageUrl: c.imageUrl,
+            overlayText: c.overlayText || "",
+            concept: c.concept || "",
+            subject: c.subject || "",
+            size: c.size || "1080x1080",
+            createdAt: new Date(c.createdAt),
+            productName: "",
+            brandColor: "#4F46E5",
+            subheadline: "",
+            cta: "",
+            textStyle: "split-text-top",
+          }))
+      );
     }
-    loadProjectSettings();
+    loadProject();
 
     // Fetch AI recommendations
     async function loadRecommendations() {
@@ -201,12 +230,16 @@ export default function CreativesPage() {
   const loadCopyVariants = useCallback(async () => {
     setLoadingCopy(true);
     try {
-      const q = query(
-        collection(getDb(), "projects", projectId, "copyVariants"),
-        orderBy("createdAt", "desc")
-      );
-      const snap = await getDocs(q);
-      const variants = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as CopyVariant);
+      const token = await getAuth_().currentUser?.getIdToken();
+      const res = await fetch(`/api/projects/${projectId}?include=copy`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        setLoadingCopy(false);
+        return;
+      }
+      const { project } = await res.json();
+      const variants = (project?.copyVariants ?? []) as CopyVariant[];
       setCopyVariants(variants);
       // Auto-select the first headline as default overlay text
       if (!selectedCopy) {
@@ -304,6 +337,7 @@ export default function CreativesPage() {
         productName: json.productName,
         brandColor: json.brandColor,
         isComplete: json.isComplete || false,
+        textStyle: json.textStyle,
         size: json.size,
         platform: json.platform,
         concept: selectedConcept!,
@@ -1205,6 +1239,7 @@ export default function CreativesPage() {
                       brandColor: creative?.brandColor || "#4F46E5",
                       size: "1080x1080",
                       isComplete: r.isComplete,
+                      textStyle: creative?.textStyle || "split-text-top",
                     })}
                   >
                     {r.baseImage && (
@@ -1288,6 +1323,7 @@ export default function CreativesPage() {
                       productName={creative.productName}
                       brandColor={creative.brandColor}
                       size={fmt.size}
+                      textStyle={(creative.textStyle as import("@/components/creative-preview").TextOverlayStyle) || "split-text-top"}
                       onClick={() => setEditingCreative({
                         baseImage: fmt.baseImage,
                         hookText: creative.hookText,
@@ -1296,6 +1332,7 @@ export default function CreativesPage() {
                         productName: creative.productName,
                         brandColor: creative.brandColor,
                         size: fmt.size,
+                        textStyle: creative.textStyle || "split-text-top",
                       })}
                     />
                   )}
@@ -1314,6 +1351,7 @@ export default function CreativesPage() {
                       productName: creative.productName,
                       brandColor: creative.brandColor,
                       size: fmt.size,
+                      textStyle: creative.textStyle || "split-text-top",
                     })}
                     className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
                   >
@@ -1409,6 +1447,42 @@ export default function CreativesPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* Saved Creatives Gallery */}
+      {savedCreatives.length > 0 && !generating && !creative && batchResults.length === 0 && (
+        <div className="mt-10">
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <Image className="h-5 w-5 text-indigo-500" />
+            {isKo ? "저장된 이미지" : "Saved Images"}
+            <Badge variant="default" className="text-xs">{savedCreatives.length}</Badge>
+          </h2>
+          <div className="mt-4 grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+            {savedCreatives.map((sc) => (
+              <Card key={sc.id} className="overflow-hidden group cursor-pointer" onClick={() => setEditingCreative({
+                baseImage: sc.imageUrl,
+                hookText: sc.overlayText,
+                subheadline: sc.subheadline,
+                cta: sc.cta,
+                productName: sc.productName,
+                brandColor: sc.brandColor,
+                size: sc.size,
+                textStyle: sc.textStyle,
+              })}>
+                <div className="aspect-square relative bg-gray-50">
+                  {sc.imageUrl && (
+                    <img src={sc.imageUrl} alt={sc.overlayText} className="w-full h-full object-cover" />
+                  )}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all" />
+                </div>
+                <CardContent className="py-2 px-3">
+                  <p className="text-xs text-gray-600 truncate">{sc.overlayText}</p>
+                  <p className="text-[10px] text-gray-400">{sc.concept} · {sc.size}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Editor Modal */}

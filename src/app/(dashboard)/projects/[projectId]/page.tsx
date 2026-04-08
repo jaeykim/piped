@@ -18,8 +18,7 @@ import {
   Sparkles,
   Loader2,
 } from "lucide-react";
-import { doc, getDoc } from "firebase/firestore";
-import { getDb, getAuth_ } from "@/lib/firebase/client";
+import { getAuth_ } from "@/lib/firebase/client";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/components/ui/toast";
 import { PipelineStepper } from "@/components/pipeline/pipeline-stepper";
@@ -51,16 +50,45 @@ export default function ProjectDetailPage() {
 
   useEffect(() => {
     async function load() {
-      const projSnap = await getDoc(doc(getDb(), "projects", projectId));
-      if (!projSnap.exists()) { router.push("/projects"); return; }
-      setProject({ id: projSnap.id, ...projSnap.data() } as Project);
+      const token = await getAuth_().currentUser?.getIdToken();
+      const res = await fetch(`/api/projects/${projectId}?include=analysis`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        router.push("/projects");
+        return;
+      }
+      const { project: p } = await res.json();
+      setProject(p as Project);
 
-      const analysisSnap = await getDoc(doc(getDb(), "projects", projectId, "analysis", "result"));
-      if (analysisSnap.exists()) setAnalysis(analysisSnap.data() as SiteAnalysis);
+      if (p.analysis) {
+        const a = p.analysis;
+        setAnalysis({
+          rawHtmlUrl: a.rawHtmlUrl ?? undefined,
+          extractedText: a.extractedText,
+          metaTags: {
+            title: a.metaTitle,
+            description: a.metaDescription,
+            ogImage: a.ogImage ?? undefined,
+            ogTitle: a.ogTitle ?? undefined,
+            ogDescription: a.ogDescription ?? undefined,
+            keywords: a.keywords ?? undefined,
+          },
+          productName: a.productName,
+          valueProposition: a.valueProposition,
+          targetAudience: a.targetAudience,
+          keyFeatures: a.keyFeatures,
+          tone: a.tone,
+          industry: a.industry,
+          brandColors: a.brandColors,
+          logoUrl: a.logoUrl ?? undefined,
+          screenshots: a.screenshots,
+          analyzedAt: new Date(a.analyzedAt),
+        });
+      }
 
-      // Load cached competitor analysis
-      const compSnap = await getDoc(doc(getDb(), "projects", projectId, "analysis", "competitors"));
-      if (compSnap.exists()) setCompetitors(compSnap.data() as typeof competitors);
+      // Competitor analysis cache was dropped during the Postgres migration —
+      // it now runs on demand via /api/analyze/competitors.
 
       setLoading(false);
     }

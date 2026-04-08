@@ -1,7 +1,8 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
-import { getFirestore, type Firestore } from "firebase/firestore";
-import { getStorage, type FirebaseStorage } from "firebase/storage";
+
+// Firebase Auth is the only Firebase product we still use on the client.
+// Firestore + Storage have been replaced by Postgres + local disk.
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -14,8 +15,6 @@ const firebaseConfig = {
 
 let _app: FirebaseApp | undefined;
 let _auth: Auth | undefined;
-let _db: Firestore | undefined;
-let _storage: FirebaseStorage | undefined;
 
 export function getApp_() {
   if (!_app) {
@@ -27,14 +26,4 @@ export function getApp_() {
 export function getAuth_() {
   if (!_auth) _auth = getAuth(getApp_());
   return _auth;
-}
-
-export function getDb() {
-  if (!_db) _db = getFirestore(getApp_());
-  return _db;
-}
-
-export function getStorage_() {
-  if (!_storage) _storage = getStorage(getApp_());
-  return _storage;
 }

@@ -17,20 +17,28 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [error, setError] = useState(false);
+
   useEffect(() => {
     if (!profile) return;
-    getUserProjects(profile.uid).then((p) => {
-      setProjects(p);
-      setLoading(false);
-    });
+    getUserProjects(profile.uid)
+      .then((p) => {
+        setProjects(p);
+      })
+      .catch(() => {
+        setError(true);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, [profile]);
 
   const stageLabel: Record<string, string> = {
-    analysis: "Analyzing",
-    copy: "Copy Ready",
-    creatives: "Creatives",
-    campaigns: "Campaigns",
-    affiliates: "Affiliates",
+    analysis: t.projects.stageAnalyzing,
+    copy: t.projects.stageCopy,
+    creatives: t.projects.stageCreatives,
+    campaigns: t.projects.stageCampaigns,
+    affiliates: t.projects.stageAffiliates,
   };
 
   const stageColor: Record<string, "default" | "info" | "success" | "warning"> = {
@@ -46,7 +54,7 @@ export default function ProjectsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{t.sidebar.projects}</h1>
-          <p className="mt-0.5 text-sm text-gray-500">{projects.length} projects</p>
+          <p className="mt-0.5 text-sm text-gray-500">{projects.length} {t.sidebar.projects.toLowerCase()}</p>
         </div>
         <Link href="/projects/new">
           <Button>

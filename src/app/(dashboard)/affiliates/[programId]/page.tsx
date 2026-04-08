@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { doc, getDoc, collection, getDocs, query, orderBy, where } from "firebase/firestore";
-import { getDb, getAuth_ } from "@/lib/firebase/client";
+import { getAuth_ } from "@/lib/firebase/client";
 import { useAuth } from "@/context/auth-context";
 import { useLocale } from "@/context/locale-context";
 import { Button } from "@/components/ui/button";
@@ -44,32 +43,41 @@ export default function ProgramDetailPage() {
 
   useEffect(() => {
     async function load() {
-      const snap = await getDoc(doc(getDb(), "affiliatePrograms", programId));
-      if (snap.exists()) {
-        const prog = { id: snap.id, ...snap.data() } as AffiliateProgram;
-        setProgram(prog);
+      const programRes = await fetch(`/api/affiliates/programs/${programId}`);
+      if (programRes.ok) {
+        const { program: prog } = await programRes.json();
+        setProgram(prog as AffiliateProgram);
 
-        // Load creatives and copy from the linked project
-        if (prog.projectId && !prog.projectId.startsWith("demo-")) {
-          const [creativeSnap, copySnap] = await Promise.all([
-            getDocs(query(collection(getDb(), "projects", prog.projectId, "creatives"), orderBy("createdAt", "desc"))),
-            getDocs(query(collection(getDb(), "projects", prog.projectId, "copyVariants"), orderBy("createdAt", "desc"))),
-          ]);
-          setCreatives(creativeSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Creative).filter((c) => c.status === "ready"));
-          setCopyVariants(copySnap.docs.map((d) => ({ id: d.id, ...d.data() }) as CopyVariant));
+        if (prog?.projectId) {
+          const token = await getAuth_().currentUser?.getIdToken();
+          const projRes = await fetch(
+            `/api/projects/${prog.projectId}?include=creatives,copy`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          if (projRes.ok) {
+            const { project } = await projRes.json();
+            setCreatives(
+              (project?.creatives ?? [])
+                .filter((c: Creative) => c.status === "ready") as Creative[]
+            );
+            setCopyVariants((project?.copyVariants ?? []) as CopyVariant[]);
+          }
         }
       }
-      // Check if user already joined
+
+      // Has the influencer already joined? Earnings list contains
+      // every link they own, so we can scan it for this program.
       if (profile?.uid) {
-        const linksSnap = await getDocs(
-          query(
-            collection(getDb(), "affiliateLinks"),
-            where("programId", "==", programId),
-            where("influencerId", "==", profile.uid)
-          )
-        );
-        if (!linksSnap.empty) {
-          setAffiliateCode(linksSnap.docs[0].data().code);
+        const token = await getAuth_().currentUser?.getIdToken();
+        const earningsRes = await fetch("/api/affiliates/earnings", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (earningsRes.ok) {
+          const data = await earningsRes.json();
+          const existing = (data.links || []).find(
+            (l: { programId: string; code: string }) => l.programId === programId
+          );
+          if (existing) setAffiliateCode(existing.code);
         }
       }
 

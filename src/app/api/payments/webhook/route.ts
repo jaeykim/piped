@@ -3,10 +3,20 @@ import Stripe from "stripe";
 import { addCredits } from "@/lib/services/credits";
 
 function getStripe() {
-  return new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_placeholder");
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key || key === "sk_test_placeholder") {
+    throw new Error("STRIPE_NOT_CONFIGURED");
+  }
+  return new Stripe(key);
 }
 
 export async function POST(request: NextRequest) {
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    console.error("STRIPE_WEBHOOK_SECRET is not configured");
+    return NextResponse.json({ error: "Webhook not configured" }, { status: 500 });
+  }
+
   const body = await request.text();
   const sig = request.headers.get("stripe-signature");
 
@@ -16,11 +26,7 @@ export async function POST(request: NextRequest) {
 
   let event: Stripe.Event;
   try {
-    event = getStripe().webhooks.constructEvent(
-      body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET || ""
-    );
+    event = getStripe().webhooks.constructEvent(body, sig, webhookSecret);
   } catch (err) {
     console.error("Webhook signature verification failed:", err);
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
@@ -36,24 +42,6 @@ export async function POST(request: NextRequest) {
       try {
         await addCredits(uid, credits, "credit-purchase", `${packId} pack — ${credits} credits`);
         console.log(`Credits added: ${credits} to user ${uid}`);
-
-        // Trigger affiliate conversion for the purchase
-        const amountPaid = (session.amount_total || 0) / 100; // cents to dollars
-        if (amountPaid > 0) {
-          try {
-            // Check if user was referred (look for ref in client_reference_id or custom field)
-            const { adminDb: db } = await import("@/lib/firebase/admin");
-            const { FieldValue: FV } = await import("firebase-admin/firestore");
-            // Find any affiliate link that referred this user (check recent click events)
-            const recentClicks = await db.collection("affiliateEvents")
-              .where("type", "==", "click")
-              .orderBy("createdAt", "desc")
-              .limit(50)
-              .get();
-            // This is a simplified approach — in production, store ref on user profile at signup
-            console.log(`Purchase conversion: $${amountPaid} for user ${uid}`);
-          } catch { /* silent */ }
-        }
       } catch (err) {
         console.error("Failed to add credits:", err);
         return NextResponse.json({ error: "Credit addition failed" }, { status: 500 });

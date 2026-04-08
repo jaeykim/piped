@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase/admin";
+import { adminAuth } from "@/lib/firebase/admin";
+import { prisma } from "@/lib/prisma";
 import { generateImage } from "@/lib/services/image-generator";
 import type { ImageRequest } from "@/lib/services/image-generator";
-import { FieldValue } from "firebase-admin/firestore";
 import type { SiteAnalysis } from "@/types/analysis";
 
 export const maxDuration = 120;
@@ -25,39 +25,44 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify ownership
-    const projectSnap = await adminDb.doc(`projects/${projectId}`).get();
-    if (!projectSnap.exists || projectSnap.data()?.ownerId !== uid) {
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      include: { analysis: true },
+    });
+    if (!project || project.ownerId !== uid) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-
-    // Get analysis
-    const analysisSnap = await adminDb
-      .doc(`projects/${projectId}/analysis/result`)
-      .get();
-    if (!analysisSnap.exists) {
-      return NextResponse.json(
-        { error: "Analysis not found" },
-        { status: 400 }
-      );
+    if (!project.analysis) {
+      return NextResponse.json({ error: "Analysis not found" }, { status: 400 });
     }
 
-    const analysis = analysisSnap.data() as SiteAnalysis;
-    const websiteUrl = projectSnap.data()?.url;
+    const analysis: SiteAnalysis = {
+      extractedText: project.analysis.extractedText,
+      metaTags: {
+        title: project.analysis.metaTitle,
+        description: project.analysis.metaDescription,
+      },
+      productName: project.analysis.productName,
+      valueProposition: project.analysis.valueProposition,
+      targetAudience: project.analysis.targetAudience,
+      keyFeatures: project.analysis.keyFeatures,
+      tone: project.analysis.tone,
+      industry: project.analysis.industry,
+      brandColors: project.analysis.brandColors,
+      logoUrl: project.analysis.logoUrl ?? undefined,
+      screenshots: project.analysis.screenshots,
+      analyzedAt: project.analysis.analyzedAt,
+    };
+    const websiteUrl = project.url;
+
     const requests: ImageRequest[] = (customRequests || [
       { size: "1080x1080", platform: "instagram", concept: "product-hero" },
       { size: "1200x628", platform: "facebook", concept: "urgency" },
     ]).map((r: ImageRequest) => ({ ...r, websiteUrl }));
 
-    // Delete existing creatives first
-    const existingCreatives = await adminDb
-      .collection(`projects/${projectId}/creatives`)
-      .get();
-    const deleteBatch = adminDb.batch();
-    existingCreatives.docs.forEach((d) => deleteBatch.delete(d.ref));
-    if (!existingCreatives.empty) await deleteBatch.commit();
+    // Replace existing creatives
+    await prisma.creative.deleteMany({ where: { projectId } });
 
-    // Generate images sequentially to avoid rate limits
     const results: {
       imageDataUrl: string;
       prompt: string;
@@ -94,52 +99,44 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Save creative metadata to Firestore (without the large base64 data)
-    const batch = adminDb.batch();
-    const creativesCollection = adminDb.collection(
-      `projects/${projectId}/creatives`
+    // Bulk insert via $transaction so we can collect IDs back
+    const created = await prisma.$transaction(
+      results.map((c) =>
+        prisma.creative.create({
+          data: {
+            projectId,
+            imageUrl: "",
+            prompt: c.prompt,
+            size: c.size,
+            platform: c.platform,
+            concept: c.concept,
+            overlayText: c.overlayText,
+            status: c.status,
+          },
+        })
+      )
     );
 
-    const creativeIds: string[] = [];
-    results.forEach((c) => {
-      const ref = creativesCollection.doc();
-      creativeIds.push(ref.id);
-      batch.set(ref, {
-        imageUrl: "",
-        prompt: c.prompt,
-        size: c.size,
-        platform: c.platform,
-        concept: c.concept,
-        overlayText: c.overlayText,
-        status: c.status,
-        createdAt: FieldValue.serverTimestamp(),
-      });
+    await prisma.project.update({
+      where: { id: projectId },
+      data: { pipelineStage: "campaigns" },
     });
-
-    // Update project pipeline stage
-    batch.update(adminDb.doc(`projects/${projectId}`), {
-      pipelineStage: "campaigns",
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-
-    await batch.commit();
 
     return NextResponse.json({
       success: true,
-      creatives: results.map((c, i) => ({
-        id: creativeIds[i],
-        imageDataUrl: c.imageDataUrl,
-        size: c.size,
-        platform: c.platform,
-        status: c.status,
+      creatives: created.map((c, i) => ({
+        id: c.id,
+        imageDataUrl: results[i].imageDataUrl,
+        size: results[i].size,
+        platform: results[i].platform,
+        status: results[i].status,
       })),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const stack = error instanceof Error ? error.stack : "";
-    console.error("Creative generation error:", message, stack);
+    console.error("Creative generation error:", message, error instanceof Error ? error.stack : "");
     return NextResponse.json(
-      { error: message, detail: stack?.split("\n").slice(0, 3).join(" | ") },
+      { error: "Creative generation failed. Please try again." },
       { status: 500 }
     );
   }

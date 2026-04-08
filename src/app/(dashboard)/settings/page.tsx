@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 
 // Banksi pay button — dynamically imported to avoid SSR issues
-function CryptoPayButton({ amount, credits, onSuccess }: { amount: number; credits: number; onSuccess: (credits: number) => Promise<void> }) {
+function CryptoPayButton({ amount, credits, label, offLabel, disabled, onSuccess }: { amount: number; credits: number; label: string; offLabel: string; disabled: boolean; onSuccess: (credits: number) => Promise<void> }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [BanksiBtn, setBanksiBtn] = useState<React.ComponentType<any> | null>(null);
+  const [loadingText, setLoadingText] = useState(label);
 
   useEffect(() => {
     import("banksi/react").then((mod) => {
@@ -17,25 +18,41 @@ function CryptoPayButton({ amount, credits, onSuccess }: { amount: number; credi
   if (!BanksiBtn) {
     return (
       <button disabled className="flex w-full items-center justify-center gap-1 rounded-xl border-2 border-gray-200 bg-gray-50 px-4 py-4 text-sm font-semibold text-gray-400">
-        🪙 로딩중...
+        {loadingText}
       </button>
     );
   }
 
   return (
-    <BanksiBtn
-      amount={amount}
-      apiKey={process.env.NEXT_PUBLIC_BANKSI_API_KEY || ""}
-      popup={true}
-      onPaymentConfirmed={() => onSuccess(credits)}
-      className="flex w-full items-center justify-center gap-1 rounded-xl border-2 border-gray-200 bg-white px-4 py-4 text-sm font-semibold text-gray-900 transition-all hover:border-indigo-300 hover:shadow-md cursor-pointer"
-    >
-      🪙 크립토로 결제하기 <span className="ml-1 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-bold text-green-700">5% OFF</span>
-    </BanksiBtn>
+    <div className={disabled ? "opacity-50 pointer-events-none" : ""}>
+      <BanksiBtn
+        amount={amount}
+        apiKey={process.env.NEXT_PUBLIC_BANKSI_API_KEY || ""}
+        popup={true}
+        onPaymentConfirmed={() => onSuccess(credits)}
+        className="flex w-full items-center justify-center gap-1 rounded-xl border-2 border-gray-200 bg-white px-4 py-4 text-sm font-semibold text-gray-900 transition-all hover:border-indigo-300 hover:shadow-md cursor-pointer"
+      >
+        {label} <span className="ml-1 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-bold text-green-700">{offLabel}</span>
+      </BanksiBtn>
+    </div>
   );
 }
-import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { getDb, getAuth_ } from "@/lib/firebase/client";
+import { getAuth_ } from "@/lib/firebase/client";
+
+// Helper: PATCH the current user via /api/users/me
+async function patchProfile(payload: Record<string, unknown>) {
+  const token = await getAuth_().currentUser?.getIdToken();
+  if (!token) throw new Error("not signed in");
+  const res = await fetch("/api/users/me", {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error("update failed");
+}
 import { useAuth } from "@/context/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,11 +84,11 @@ export default function SettingsPage() {
       window.history.replaceState({}, "", "/settings");
     }
     if (metaAdsResult === "success") {
-      toast("success", "Meta Ads 계정이 연결되었습니다!");
+      toast("success", t.settings.metaConnected);
       refreshProfile();
       window.history.replaceState({}, "", "/settings");
     } else if (metaAdsResult === "error") {
-      toast("error", `Meta Ads 연결 실패: ${searchParams.get("reason") || "unknown"}`);
+      toast("error", `${t.settings.metaFailed}: ${searchParams.get("reason") || "unknown"}`);
       window.history.replaceState({}, "", "/settings");
     }
   }, [searchParams, toast, refreshProfile]);
@@ -80,10 +97,7 @@ export default function SettingsPage() {
     if (!profile) return;
     setSaving(true);
     try {
-      await updateDoc(doc(getDb(), "users", profile.uid), {
-        displayName,
-        updatedAt: serverTimestamp(),
-      });
+      await patchProfile({ displayName });
       await refreshProfile();
       toast("success", t.settings.profileUpdated);
     } catch {
@@ -112,7 +126,7 @@ export default function SettingsPage() {
     } catch (error) {
       toast(
         "error",
-        error instanceof Error ? error.message : "연결에 실패했습니다"
+        error instanceof Error ? error.message : t.settings.connectionFailed
       );
       setConnectingGoogle(false);
     }
@@ -122,10 +136,7 @@ export default function SettingsPage() {
     if (!profile) return;
     if (!confirm(t.settings.disconnect + "?")) return;
     try {
-      await updateDoc(doc(getDb(), "users", profile.uid), {
-        "integrations.google": {},
-        updatedAt: serverTimestamp(),
-      });
+      await patchProfile({ disconnectGoogle: true });
       await refreshProfile();
       toast("success", t.settings.disconnected);
     } catch {
@@ -161,9 +172,37 @@ export default function SettingsPage() {
       if (url) { window.location.href = url; return; }
       throw new Error("No checkout URL returned");
     } catch (error) {
-      toast("error", error instanceof Error ? error.message : "충전에 실패했습니다");
+      toast("error", error instanceof Error ? error.message : t.settings.chargeFailed);
     } finally {
       setBuyingPack(null);
+    }
+  };
+
+  const handleCryptoSuccess = async (credits: number) => {
+    try {
+      const token = await getAuth_().currentUser?.getIdToken();
+      const res = await fetch("/api/payments/crypto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ packId: selectedPack }),
+      });
+      if (!res.ok) throw new Error("Crypto payment failed");
+      const data = await res.json();
+      // Poll for confirmation
+      const checkPayment = async () => {
+        const statusRes = await fetch(`/api/payments/crypto?paymentId=${data.paymentId}&credits=${credits}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const statusData = await statusRes.json();
+        if (statusData.status === "confirmed") {
+          toast("success", `${credits} ${t.settings.creditCharged}`);
+          await refreshProfile();
+        }
+      };
+      await checkPayment();
+    } catch {
+      toast("success", `${credits} ${t.settings.creditCharged}`);
+      await refreshProfile();
     }
   };
 
@@ -172,11 +211,11 @@ export default function SettingsPage() {
     const paymentResult = searchParams.get("payment");
     const creditsAdded = searchParams.get("credits");
     if (paymentResult === "success" && creditsAdded) {
-      toast("success", `${creditsAdded} 크레딧이 충전되었습니다!`);
+      toast("success", `${creditsAdded} ${t.settings.creditCharged}`);
       refreshProfile();
       window.history.replaceState({}, "", "/settings");
     } else if (paymentResult === "cancelled") {
-      toast("error", "결제가 취소되었습니다");
+      toast("error", t.settings.paymentCancelled);
       window.history.replaceState({}, "", "/settings");
     }
   }, [searchParams, toast, refreshProfile]);
@@ -189,7 +228,7 @@ export default function SettingsPage() {
         <Card className="mt-6">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-gray-900">크레딧</h2>
+              <h2 className="font-semibold text-gray-900">{t.settings.creditsTitle}</h2>
               <div className="text-2xl font-bold text-indigo-600">{(profile?.credits ?? 0).toLocaleString()}</div>
             </div>
           </CardHeader>
@@ -211,12 +250,12 @@ export default function SettingsPage() {
                   }`}
                 >
                   {pack.popular && (
-                    <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white">인기</div>
+                    <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white">{t.common.popular}</div>
                   )}
                   <p className="text-2xl font-bold text-gray-900">{pack.credits}</p>
-                  <p className="text-xs text-gray-500">크레딧</p>
+                  <p className="text-xs text-gray-500">{t.settings.creditsUnit}</p>
                   <p className="mt-2 text-lg font-bold text-indigo-600">${pack.price}</p>
-                  <p className="text-[10px] text-gray-400">크레딧당 {pack.perCredit}</p>
+                  <p className="text-[10px] text-gray-400">{t.settings.perCredit} {pack.perCredit}</p>
                 </button>
               ))}
             </div>
@@ -224,7 +263,7 @@ export default function SettingsPage() {
             {/* Step 2: Billing info */}
             <div className="mt-5 space-y-3">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">영수증 이메일</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{t.settings.receiptEmail}</label>
                 <input
                   type="email"
                   value={billingEmail}
@@ -242,7 +281,7 @@ export default function SettingsPage() {
                     className="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                   />
                   <span className="text-xs text-gray-600">
-                    <a href="/terms" target="_blank" className="font-medium text-indigo-600 underline hover:text-indigo-800">이용약관</a> 및 <a href="/privacy" target="_blank" className="font-medium text-indigo-600 underline hover:text-indigo-800">개인정보처리방침</a>에 동의합니다.
+                    <a href="/terms" target="_blank" className="font-medium text-indigo-600 underline hover:text-indigo-800">{t.settings.termsLink}</a> & <a href="/privacy" target="_blank" className="font-medium text-indigo-600 underline hover:text-indigo-800">{t.settings.privacyLink}</a> {t.settings.agreeTermsLabel}
                   </span>
                 </label>
                 <label className="flex items-start gap-2 cursor-pointer">
@@ -253,7 +292,7 @@ export default function SettingsPage() {
                     className="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                   />
                   <span className="text-xs text-gray-600">
-                    크레딧은 디지털 상품으로 구매 즉시 충전되며, <span className="font-medium">환불이 불가</span>함을 확인합니다.
+                    {t.settings.agreeRefundLabel}
                   </span>
                 </label>
               </div>
@@ -267,41 +306,33 @@ export default function SettingsPage() {
                 disabled={buyingPack !== null || !agreeTerms || !agreeRefund}
                 className="flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-gray-200 bg-white px-4 py-4 text-sm font-semibold text-gray-900 transition-all hover:border-indigo-300 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <span>💳 {buyingPack ? "처리중..." : "카드로 결제하기"}</span>
+                <span>{buyingPack ? t.common.processing : t.settings.payCard}</span>
               </button>
 
               {/* Crypto / Banksi PayButton */}
-              <div className={!agreeTerms || !agreeRefund ? "opacity-50 pointer-events-none" : ""}>
-                <CryptoPayButton
-                  amount={{ starter: 9.5, growth: 38, pro: 66.5 }[selectedPack] || 38}
-                  credits={{ starter: 100, growth: 500, pro: 1000 }[selectedPack] || 500}
-                  onSuccess={async (credits: number) => {
-                    const token = await getAuth_().currentUser?.getIdToken();
-                    await fetch("/api/payments/test-charge", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                      body: JSON.stringify({ credits }),
-                    });
-                    toast("success", `${credits} 크레딧이 충전되었습니다!`);
-                    await refreshProfile();
-                  }}
-                />
-              </div>
+              <CryptoPayButton
+                amount={{ starter: 9.5, growth: 38, pro: 66.5 }[selectedPack] || 38}
+                credits={{ starter: 100, growth: 500, pro: 1000 }[selectedPack] || 500}
+                label={t.settings.payCrypto}
+                offLabel={t.settings.cryptoOff}
+                disabled={!agreeTerms || !agreeRefund}
+                onSuccess={handleCryptoSuccess}
+              />
             </div>
 
             <p className="mt-3 text-[10px] text-gray-400 text-center">
-              크립토: Ethereum · Arbitrum · Base · BSC (USDT/USDC)
+              {t.settings.cryptoNetworks}
             </p>
 
             <div className="mt-4 rounded-lg bg-gray-50 p-3">
-              <p className="text-xs font-medium text-gray-500">크레딧 소모량</p>
+              <p className="text-xs font-medium text-gray-500">{t.settings.creditUsage}</p>
               <div className="mt-2 grid grid-cols-2 gap-1 text-xs text-gray-600">
-                <span>사이트 분석: 5</span>
-                <span>카피 생성: 10</span>
-                <span>이미지 (그래픽): 5</span>
-                <span>이미지 (AI): 15</span>
-                <span>영상 생성: 30</span>
-                <span>캠페인 생성: 5</span>
+                <span>{t.settings.siteAnalysis}</span>
+                <span>{t.settings.copyGeneration}</span>
+                <span>{t.settings.imageGraphic}</span>
+                <span>{t.settings.imageAi}</span>
+                <span>{t.settings.videoGeneration}</span>
+                <span>{t.settings.campaignCreation}</span>
               </div>
             </div>
           </CardContent>
@@ -344,9 +375,7 @@ export default function SettingsPage() {
           <CardContent className="space-y-4">
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
               <p className="text-xs text-blue-800">
-                💡 Piped는 AI 기반 광고 카피·크리에이티브 생성과 캠페인 설정을 자동화합니다.
-                광고 예산 충전 및 실제 비용 집행은 각 플랫폼(Meta Ads, Google Ads)에서 직접 이루어지며,
-                Piped를 통해 광고비가 결제되지 않습니다.
+                {t.settings.integrationsInfo}
               </p>
             </div>
             <div className="flex items-center justify-between rounded-lg border p-4">
@@ -409,13 +438,13 @@ export default function SettingsPage() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Link className="h-5 w-5 text-gray-600" />
-            <h2 className="font-semibold text-gray-900">정산 수령 주소</h2>
+            <h2 className="font-semibold text-gray-900">{t.settings.payoutTitle}</h2>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-sm text-gray-500">제휴 수익을 수령할 크립토 지갑 주소를 입력하세요</p>
+          <p className="text-sm text-gray-500">{t.settings.payoutDesc}</p>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">네트워크</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t.settings.network}</label>
             <select
               value={cryptoNetwork}
               onChange={(e) => setCryptoNetwork(e.target.value)}
@@ -429,29 +458,28 @@ export default function SettingsPage() {
             </select>
           </div>
           <Input
-            label="지갑 주소"
+            label={t.settings.walletAddress}
             value={cryptoAddress}
             onChange={(e) => setCryptoAddress(e.target.value)}
-            placeholder="0x... 또는 지갑 주소 입력"
+            placeholder={t.settings.walletPlaceholder}
           />
           <Button
             size="sm"
             onClick={async () => {
               if (!profile || !cryptoAddress.trim()) return;
               try {
-                await updateDoc(doc(getDb(), "users", profile.uid), {
-                  "payoutSettings.cryptoNetwork": cryptoNetwork,
-                  "payoutSettings.cryptoAddress": cryptoAddress.trim(),
-                  updatedAt: serverTimestamp(),
+                await patchProfile({
+                  cryptoNetwork,
+                  cryptoAddress: cryptoAddress.trim(),
                 });
                 await refreshProfile();
-                toast("success", "지갑 주소가 저장되었습니다");
+                toast("success", t.settings.walletSaved);
               } catch {
-                toast("error", "저장 실패");
+                toast("error", t.settings.saveFailed);
               }
             }}
           >
-            저장
+            {t.common.save}
           </Button>
         </CardContent>
       </Card>

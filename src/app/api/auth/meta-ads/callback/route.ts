@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase/admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { adminAuth } from "@/lib/firebase/admin";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
@@ -49,15 +49,16 @@ export async function GET(request: NextRequest) {
       }
     } catch { /* ignore */ }
 
-    // Save to Firestore
-    await adminDb.doc(`users/${uid}`).update({
-      "integrations.meta": {
-        accessToken: llTokens.access_token,
-        adAccountId,
-        expiresAt: new Date(Date.now() + (llTokens.expires_in || 5184000) * 1000),
-        connectedAt: FieldValue.serverTimestamp(),
+    await prisma.user.update({
+      where: { id: uid },
+      data: {
+        metaAccessToken: llTokens.access_token,
+        metaAdAccountId: adAccountId,
+        metaExpiresAt: new Date(
+          Date.now() + (llTokens.expires_in || 5184000) * 1000
+        ),
+        metaConnectedAt: new Date(),
       },
-      updatedAt: FieldValue.serverTimestamp(),
     });
 
     return NextResponse.redirect(`${baseUrl}/settings?meta_ads=success`);

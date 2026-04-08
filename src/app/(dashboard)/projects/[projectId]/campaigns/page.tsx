@@ -3,10 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import {
-  collection, getDocs, query, where, orderBy,
-} from "firebase/firestore";
-import { getDb, getAuth_ } from "@/lib/firebase/client";
+import { getAuth_ } from "@/lib/firebase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,13 +26,14 @@ export default function CampaignsPage() {
   const [refreshing, setRefreshing] = useState(false);
 
   async function loadCampaigns() {
-    const q = query(
-      collection(getDb(), "campaigns"),
-      where("projectId", "==", projectId),
-      orderBy("createdAt", "desc")
-    );
-    const snap = await getDocs(q);
-    setCampaigns(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Campaign));
+    const token = await getAuth_().currentUser?.getIdToken();
+    const res = await fetch(`/api/campaigns?projectId=${projectId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setCampaigns(data.campaigns as Campaign[]);
+    }
     setLoading(false);
   }
 
@@ -75,12 +73,9 @@ export default function CampaignsPage() {
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({ campaignId: campaign.platformCampaignId }),
         });
-        if (res.ok) {
-          const { metrics } = await res.json();
-          // Update Firestore
-          const { doc, updateDoc } = await import("firebase/firestore");
-          await updateDoc(doc(getDb(), "campaigns", campaign.id), { metrics, updatedAt: new Date() });
-        }
+        // Metrics are read live from Meta on demand; we no longer cache
+        // them on the campaign row. Insights endpoint handles aggregation.
+        if (!res.ok) continue;
       }
       await loadCampaigns();
       toast("success", t.campaigns.metricsUpdated);
@@ -98,13 +93,13 @@ export default function CampaignsPage() {
       const res = await fetch("/api/campaigns/meta/control", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ adId: campaign.platformCampaignId, status: newStatus }),
+        body: JSON.stringify({
+          adId: campaign.platformCampaignId,
+          status: newStatus,
+          campaignDocId: campaign.id,
+        }),
       });
       if (res.ok) {
-        const { doc, updateDoc } = await import("firebase/firestore");
-        await updateDoc(doc(getDb(), "campaigns", campaign.id), {
-          status: newStatus === "ACTIVE" ? "active" : "paused",
-        });
         await loadCampaigns();
         toast("success", newStatus === "ACTIVE" ? t.campaigns.adStarted : t.campaigns.adPaused);
       }

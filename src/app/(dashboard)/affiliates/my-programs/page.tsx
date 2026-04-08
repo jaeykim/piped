@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { collection, getDocs, query, where } from "firebase/firestore";
-import { getDb, getAuth_ } from "@/lib/firebase/client";
+import { getAuth_ } from "@/lib/firebase/client";
 import { useAuth } from "@/context/auth-context";
 import { useLocale } from "@/context/locale-context";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -54,29 +53,24 @@ export default function MyProgramsPage() {
 
   async function loadLinks() {
     if (!profile) return;
-    const q = query(
-      collection(getDb(), "affiliateLinks"),
-      where("influencerId", "==", profile.uid)
-    );
-    const snap = await getDocs(q);
-    const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as AffiliateLink);
-
-    const enriched = await Promise.all(
-      items.map(async (link) => {
-        const { getDoc, doc } = await import("firebase/firestore");
-        const programSnap = await getDoc(doc(getDb(), "affiliatePrograms", link.programId));
-        return { ...link, programName: programSnap.exists() ? (programSnap.data() as { name: string }).name : "Unknown" };
-      })
-    );
-    setLinks(enriched);
-
-    // Fetch earnings and payout data
     const token = await getAuth_().currentUser?.getIdToken();
+
     const [earningsRes, payoutsRes] = await Promise.all([
       fetch("/api/affiliates/earnings", { headers: { Authorization: `Bearer ${token}` } }),
       fetch("/api/affiliates/payouts", { headers: { Authorization: `Bearer ${token}` } }),
     ]);
-    if (earningsRes.ok) setEarningsData(await earningsRes.json());
+    if (earningsRes.ok) {
+      const data = await earningsRes.json();
+      setEarningsData(data);
+      // earnings already includes the joined `program` object
+      const enriched = (data.links || []).map(
+        (link: AffiliateLink & { program?: { name?: string } }) => ({
+          ...link,
+          programName: link.program?.name ?? "Unknown",
+        })
+      );
+      setLinks(enriched);
+    }
     if (payoutsRes.ok) setPayoutData(await payoutsRes.json());
 
     setLoading(false);

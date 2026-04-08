@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase/admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,54 +8,42 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Code required" }, { status: 400 });
     }
 
-    // Find the affiliate link
-    const linksSnap = await adminDb
-      .collection("affiliateLinks")
-      .where("code", "==", code)
-      .limit(1)
-      .get();
-
-    if (linksSnap.empty) {
+    const link = await prisma.affiliateLink.findUnique({
+      where: { code },
+      include: { program: { select: { cookieDurationDays: true } } },
+    });
+    if (!link) {
       return NextResponse.json({ error: "Link not found" }, { status: 404 });
     }
 
-    const linkDoc = linksSnap.docs[0];
-    const linkData = linkDoc.data();
+    const cookieDays = link.program?.cookieDurationDays ?? 30;
 
-    // Get cookie duration from program
-    let cookieDays = 30;
-    try {
-      const programSnap = await adminDb.doc(`affiliatePrograms/${linkData.programId}`).get();
-      if (programSnap.exists) {
-        cookieDays = programSnap.data()?.cookieDurationDays || 30;
-      }
-    } catch { /* use default */ }
+    await prisma.$transaction([
+      prisma.affiliateEvent.create({
+        data: {
+          linkId: link.id,
+          programId: link.programId,
+          influencerId: link.influencerId,
+          type: "click",
+        },
+      }),
+      prisma.affiliateLink.update({
+        where: { id: link.id },
+        data: { clicks: { increment: 1 } },
+      }),
+    ]);
 
-    // Record click event
-    await adminDb.collection("affiliateEvents").add({
-      linkId: linkDoc.id,
-      programId: linkData.programId,
-      influencerId: linkData.influencerId,
-      type: "click",
-      createdAt: FieldValue.serverTimestamp(),
-    });
-
-    // Increment click counter
-    await linkDoc.ref.update({ clicks: FieldValue.increment(1) });
-
-    // Redirect with referral cookie
-    const destinationUrl = linkData.destinationUrl || "/";
+    const destinationUrl = link.destinationUrl || "/";
     const separator = destinationUrl.includes("?") ? "&" : "?";
     const redirectUrl = `${destinationUrl}${separator}ref=${code}`;
 
     const response = NextResponse.redirect(redirectUrl, 302);
-
-    // Set referral cookie (lasts for cookieDuration days)
     response.cookies.set("piped_ref", code, {
       maxAge: cookieDays * 24 * 60 * 60,
       path: "/",
-      httpOnly: false, // readable by client JS for conversion tracking
-      sameSite: "lax",
+      httpOnly: true,
+      sameSite: "strict",
+      secure: process.env.NODE_ENV === "production",
     });
 
     return response;

@@ -48,7 +48,6 @@ Available subjects (visual style):
 - "graphic-card": Bold background color + large text overlay (most common Korean Meta ad style)
 - "product-ui": Device mockup showing the product interface
 - "person-product": Real person using the product
-- "animal-mascot": Cute animal character for approachable branding
 
 Return a JSON array of exactly 3 recommendations, ranked by expected performance:
 [

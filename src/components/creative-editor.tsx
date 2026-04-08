@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Download, Type, Sun, Contrast, X, RotateCcw, Eye, EyeOff, GripVertical, Check } from "lucide-react";
+import type { TextOverlayStyle } from "@/components/creative-preview";
 
 export interface CreativeEditorData {
   baseImage: string;
@@ -13,6 +14,7 @@ export interface CreativeEditorData {
   brandColor: string;
   size: string;
   isComplete?: boolean; // graphic card — text already baked in
+  textStyle?: string; // text overlay style from creative-preview
 }
 
 interface TextLayer {
@@ -93,14 +95,19 @@ export function CreativeEditor({ data, onClose, onSave }: Props) {
   const [brightness, setBrightness] = useState(100);
   const [contrast, setContrast] = useState(100);
   const [saturation, setSaturation] = useState(100);
-  const [overlayOpacity, setOverlayOpacity] = useState(data.isComplete ? 0 : 40);
+  const textStyleProp = (data.textStyle || "split-text-top") as TextOverlayStyle;
+  const [overlayOpacity, setOverlayOpacity] = useState(data.isComplete ? 0 : (textStyleProp === "split-text-top" ? 0 : 40));
 
   // Text layers — hidden by default for graphic cards (text already baked in)
   const showText = !data.isComplete;
   const defaultFont = FONT_OPTIONS[0].value;
   const [layers, setLayers] = useState<TextLayer[]>([
-    { id: "headline", label: "헤드라인", text: data.hookText, visible: showText, x: 7, y: 5, fontSize: 100, color: "#FFFFFF", fontFamily: defaultFont, shadow: true },
-    { id: "sub", label: "서브 텍스트", text: data.subheadline || "", visible: showText && !!(data.subheadline), x: 7, y: 40, fontSize: 100, color: "rgba(255,255,255,0.85)", fontFamily: defaultFont, shadow: true },
+    { id: "headline", label: "헤드라인", text: data.hookText, visible: showText, x: 7, y: 3, fontSize: 100,
+      color: textStyleProp === "split-text-top" ? "#1a1a2e" : "#FFFFFF",
+      fontFamily: defaultFont, shadow: textStyleProp !== "split-text-top" },
+    { id: "sub", label: "서브 텍스트", text: data.subheadline || "", visible: showText && !!(data.subheadline), x: 7, y: 22, fontSize: 100,
+      color: textStyleProp === "split-text-top" ? "rgba(26,26,46,0.5)" : "rgba(255,255,255,0.85)",
+      fontFamily: defaultFont, shadow: textStyleProp !== "split-text-top" },
     { id: "cta", label: "CTA 버튼", text: data.cta || "", visible: showText && !!(data.cta), x: 30, y: 85, fontSize: 100, color: "#FFFFFF", fontFamily: defaultFont, shadow: true },
     { id: "brand", label: "브랜드", text: data.productName, visible: showText, x: 7, y: 92, fontSize: 100, color: "rgba(255,255,255,0.7)", fontFamily: defaultFont, shadow: false },
   ]);
@@ -129,20 +136,32 @@ export function CreativeEditor({ data, onClose, onSave }: Props) {
     ctx.drawImage(baseImg, 0, 0, w, h);
     ctx.filter = "none";
 
-    // Gradient overlay for readability
-    const opacity = overlayOpacity / 100;
-    if (opacity > 0) {
-      const topG = ctx.createLinearGradient(0, 0, 0, h * 0.5);
-      topG.addColorStop(0, `rgba(0,0,0,${opacity * 0.7})`);
-      topG.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = topG;
-      ctx.fillRect(0, 0, w, h * 0.5);
+    // Style-specific overlay for readability (matches CreativePreview)
+    if (textStyleProp === "split-text-top" && !data.isComplete) {
+      // White panel at top (max 30% of height)
+      const panelH = Math.round(h * 0.30);
+      ctx.fillStyle = "rgba(255,255,255,0.93)";
+      ctx.fillRect(0, 0, w, panelH);
+      ctx.fillStyle = "rgba(0,0,0,0.06)";
+      ctx.fillRect(0, panelH, w, 2);
+    } else if (textStyleProp === "dark-premium" && !data.isComplete) {
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(0, 0, w, h);
+    } else {
+      const opacity = overlayOpacity / 100;
+      if (opacity > 0) {
+        const topG = ctx.createLinearGradient(0, 0, 0, h * 0.5);
+        topG.addColorStop(0, `rgba(0,0,0,${opacity * 0.7})`);
+        topG.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = topG;
+        ctx.fillRect(0, 0, w, h * 0.5);
 
-      const botG = ctx.createLinearGradient(0, h * 0.5, 0, h);
-      botG.addColorStop(0, "rgba(0,0,0,0)");
-      botG.addColorStop(1, `rgba(0,0,0,${opacity * 0.5})`);
-      ctx.fillStyle = botG;
-      ctx.fillRect(0, h * 0.5, w, h * 0.5);
+        const botG = ctx.createLinearGradient(0, h * 0.5, 0, h);
+        botG.addColorStop(0, "rgba(0,0,0,0)");
+        botG.addColorStop(1, `rgba(0,0,0,${opacity * 0.5})`);
+        ctx.fillStyle = botG;
+        ctx.fillRect(0, h * 0.5, w, h * 0.5);
+      }
     }
 
     // Render overlay image if present

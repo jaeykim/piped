@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase/admin";
+import { adminAuth } from "@/lib/firebase/admin";
+import { prisma } from "@/lib/prisma";
 import {
   getMetaCampaignDailyMetrics,
   type DailyMetric,
@@ -23,39 +24,28 @@ export async function GET(request: NextRequest) {
       Math.max(1, parseInt(request.nextUrl.searchParams.get("days") || "14"))
     );
 
-    const userSnap = await adminDb.doc(`users/${uid}`).get();
-    const meta = userSnap.data()?.integrations?.meta;
-    if (!meta?.accessToken) {
+    const user = await prisma.user.findUnique({ where: { id: uid } });
+    if (!user?.metaAccessToken) {
       return NextResponse.json(
         { error: "Meta Ads not connected", connected: false },
         { status: 200 }
       );
     }
 
-    // Pull user's Meta campaigns from Firestore
-    const campSnap = await adminDb
-      .collection("campaigns")
-      .where("ownerId", "==", uid)
-      .where("platform", "==", "meta")
-      .get();
+    const campaigns = await prisma.campaign.findMany({
+      where: {
+        ownerId: uid,
+        platform: "meta",
+        platformCampaignId: { not: null },
+      },
+    });
 
-    interface CampaignDoc {
-      id: string;
-      name?: string;
-      status?: string;
-      platformCampaignId?: string;
-      targetRoas?: number | null;
-    }
-    const campaigns: CampaignDoc[] = campSnap.docs
-      .map((d) => ({ id: d.id, ...(d.data() as Omit<CampaignDoc, "id">) }))
-      .filter((c) => !!c.platformCampaignId);
-
-    // Fetch daily insights per campaign in parallel
+    const accessToken = user.metaAccessToken;
     const perCampaign = await Promise.all(
       campaigns.map(async (c) => {
         const series = await getMetaCampaignDailyMetrics(
           c.platformCampaignId as string,
-          meta.accessToken,
+          accessToken,
           days
         );
         const totals = series.reduce(
@@ -70,9 +60,9 @@ export async function GET(request: NextRequest) {
         );
         return {
           campaignId: c.id,
-          name: c.name ?? "",
-          status: c.status ?? "paused",
-          targetRoas: c.targetRoas ?? null,
+          name: c.name,
+          status: c.status,
+          targetRoas: c.targetRoas,
           series,
           totals: {
             ...totals,
@@ -85,7 +75,6 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    // Aggregate daily across all campaigns
     const dailyMap = new Map<string, DailyMetric>();
     for (const c of perCampaign) {
       for (const d of c.series) {

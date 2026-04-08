@@ -10,14 +10,7 @@ import {
   Target,
   AlertCircle,
 } from "lucide-react";
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  getDocs,
-} from "firebase/firestore";
-import { getDb, getAuth_ } from "@/lib/firebase/client";
+import { getAuth_ } from "@/lib/firebase/client";
 import { useAuth } from "@/context/auth-context";
 import { useLocale } from "@/context/locale-context";
 import { Card, CardContent } from "@/components/ui/card";
@@ -53,15 +46,13 @@ export default function CampaignsPage() {
     if (!profile) return;
     setLoading(true);
     try {
-      const q = query(
-        collection(getDb(), "campaigns"),
-        where("ownerId", "==", profile.uid),
-        orderBy("createdAt", "desc")
-      );
-      const snap = await getDocs(q);
-      setCampaigns(
-        snap.docs.map((d) => ({ id: d.id, ...d.data() }) as CampaignDoc)
-      );
+      const token = await getAuth_().currentUser?.getIdToken();
+      const res = await fetch("/api/campaigns", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("failed");
+      const data = await res.json();
+      setCampaigns(data.campaigns as CampaignDoc[]);
     } catch {
       toast("error", isKo ? "캠페인 불러오기 실패" : "Failed to load campaigns");
     } finally {

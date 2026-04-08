@@ -1,54 +1,50 @@
-import {
-  collection,
-  doc,
-  addDoc,
-  getDoc,
-  getDocs,
-  updateDoc,
-  query,
-  where,
-  orderBy,
-  serverTimestamp,
-  setDoc,
-} from "firebase/firestore";
-import { getDb } from "@/lib/firebase/client";
+import { getAuth_ } from "@/lib/firebase/client";
 import type { Project, PipelineStage, ProjectStatus, CampaignType } from "@/types/project";
 import type { SiteAnalysis } from "@/types/analysis";
 
+// Thin client-side wrappers around the API routes — no direct DB access.
+
+async function authedFetch(path: string, init: RequestInit = {}) {
+  const u = getAuth_().currentUser;
+  if (!u) throw new Error("not signed in");
+  const token = await u.getIdToken();
+  return fetch(path, {
+    ...init,
+    headers: {
+      ...(init.headers || {}),
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+}
+
 export async function createProject(
-  ownerId: string,
+  _ownerId: string,
   url: string,
   name: string,
   campaignType?: CampaignType
 ): Promise<string> {
-  const data: Record<string, unknown> = {
-    ownerId,
-    url,
-    name,
-    status: "crawling" as ProjectStatus,
-    pipelineStage: "analysis" as PipelineStage,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  };
-  if (campaignType) data.campaignType = campaignType;
-  const docRef = await addDoc(collection(getDb(), "projects"), data);
-  return docRef.id;
+  const res = await authedFetch("/api/projects", {
+    method: "POST",
+    body: JSON.stringify({ url, name, campaignType }),
+  });
+  if (!res.ok) throw new Error((await res.json()).error || "createProject failed");
+  const data = await res.json();
+  return data.project.id as string;
 }
 
 export async function getProject(projectId: string): Promise<Project | null> {
-  const snap = await getDoc(doc(getDb(), "projects", projectId));
-  if (!snap.exists()) return null;
-  return { id: snap.id, ...snap.data() } as Project;
+  const res = await authedFetch(`/api/projects/${projectId}`);
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.project as Project;
 }
 
-export async function getUserProjects(ownerId: string): Promise<Project[]> {
-  const q = query(
-    collection(getDb(), "projects"),
-    where("ownerId", "==", ownerId),
-    orderBy("createdAt", "desc")
-  );
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Project);
+export async function getUserProjects(_ownerId: string): Promise<Project[]> {
+  const res = await authedFetch("/api/projects");
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.projects as Project[];
 }
 
 export async function updateProjectStatus(
@@ -56,33 +52,47 @@ export async function updateProjectStatus(
   status: ProjectStatus,
   pipelineStage?: PipelineStage
 ) {
-  const updates: Record<string, unknown> = {
-    status,
-    updatedAt: serverTimestamp(),
-  };
-  if (pipelineStage) updates.pipelineStage = pipelineStage;
-  await updateDoc(doc(getDb(), "projects", projectId), updates);
-}
-
-export async function saveAnalysis(
-  projectId: string,
-  analysis: SiteAnalysis
-) {
-  await setDoc(
-    doc(getDb(), "projects", projectId, "analysis", "result"),
-    {
-      ...analysis,
-      analyzedAt: serverTimestamp(),
-    }
-  );
+  await authedFetch(`/api/projects/${projectId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status, pipelineStage }),
+  });
 }
 
 export async function getAnalysis(
   projectId: string
 ): Promise<SiteAnalysis | null> {
-  const snap = await getDoc(
-    doc(getDb(), "projects", projectId, "analysis", "result")
-  );
-  if (!snap.exists()) return null;
-  return snap.data() as SiteAnalysis;
+  const res = await authedFetch(`/api/projects/${projectId}?include=analysis`);
+  if (!res.ok) return null;
+  const data = await res.json();
+  if (!data.project?.analysis) return null;
+  // Re-shape Prisma row → SiteAnalysis interface the client uses.
+  const a = data.project.analysis;
+  return {
+    rawHtmlUrl: a.rawHtmlUrl ?? undefined,
+    extractedText: a.extractedText,
+    metaTags: {
+      title: a.metaTitle,
+      description: a.metaDescription,
+      ogImage: a.ogImage ?? undefined,
+      ogTitle: a.ogTitle ?? undefined,
+      ogDescription: a.ogDescription ?? undefined,
+      keywords: a.keywords ?? undefined,
+    },
+    productName: a.productName,
+    valueProposition: a.valueProposition,
+    targetAudience: a.targetAudience,
+    keyFeatures: a.keyFeatures,
+    tone: a.tone,
+    industry: a.industry,
+    brandColors: a.brandColors,
+    logoUrl: a.logoUrl ?? undefined,
+    screenshots: a.screenshots,
+    analyzedAt: new Date(a.analyzedAt),
+  };
+}
+
+// saveAnalysis is now server-only (called from /api/crawl). Stub kept for
+// backward compatibility — throws so any stray client caller fails loudly.
+export async function saveAnalysis(): Promise<never> {
+  throw new Error("saveAnalysis is server-only — call POST /api/crawl");
 }

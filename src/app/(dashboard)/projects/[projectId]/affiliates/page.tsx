@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { doc, getDoc, collection, getDocs, query, where, orderBy } from "firebase/firestore";
-import { getDb, getAuth_ } from "@/lib/firebase/client";
+import { getAuth_ } from "@/lib/firebase/client";
 import { useAuth } from "@/context/auth-context";
 import { useLocale } from "@/context/locale-context";
 import { Button } from "@/components/ui/button";
@@ -362,34 +361,54 @@ export default function AffiliatesPage() {
 
   useEffect(() => {
     async function load() {
-      // Get analysis for product name
-      const analysisSnap = await getDoc(
-        doc(getDb(), "projects", projectId, "analysis", "result")
-      );
-      if (analysisSnap.exists()) {
-        const data = analysisSnap.data() as SiteAnalysis;
-        setAnalysis(data);
-        setForm((f) => ({
-          ...f,
-          name: `${data.productName} Affiliate Program`,
-          description: `Promote ${data.productName} and earn commissions on every referral.`,
-        }));
+      const token = await getAuth_().currentUser?.getIdToken();
+      const headers = { Authorization: `Bearer ${token}` };
+
+      const [projRes, programsRes] = await Promise.all([
+        fetch(`/api/projects/${projectId}?include=analysis,creatives,copy`, {
+          headers,
+        }),
+        fetch(`/api/affiliates/programs?projectId=${projectId}`, { headers }),
+      ]);
+
+      if (projRes.ok) {
+        const { project } = await projRes.json();
+        if (project?.analysis) {
+          const a = project.analysis;
+          const data: SiteAnalysis = {
+            extractedText: a.extractedText,
+            metaTags: { title: a.metaTitle, description: a.metaDescription },
+            productName: a.productName,
+            valueProposition: a.valueProposition,
+            targetAudience: a.targetAudience,
+            keyFeatures: a.keyFeatures,
+            tone: a.tone,
+            industry: a.industry,
+            brandColors: a.brandColors,
+            logoUrl: a.logoUrl ?? undefined,
+            screenshots: a.screenshots,
+            analyzedAt: new Date(a.analyzedAt),
+          };
+          setAnalysis(data);
+          setForm((f) => ({
+            ...f,
+            name: `${data.productName} Affiliate Program`,
+            description: `Promote ${data.productName} and earn commissions on every referral.`,
+          }));
+        }
+        setCreatives(
+          ((project?.creatives ?? []) as Creative[]).filter(
+            (c) => c.status === "ready"
+          )
+        );
+        setCopyVariants((project?.copyVariants ?? []) as CopyVariant[]);
       }
 
-      // Check for existing program + load materials
-      const [programsSnap, creativeSnap, copySnap] = await Promise.all([
-        getDocs(query(collection(getDb(), "affiliatePrograms"), where("projectId", "==", projectId))),
-        getDocs(query(collection(getDb(), "projects", projectId, "creatives"), orderBy("createdAt", "desc"))),
-        getDocs(query(collection(getDb(), "projects", projectId, "copyVariants"), orderBy("createdAt", "desc"))),
-      ]);
-      if (!programsSnap.empty) {
-        setProgram({
-          id: programsSnap.docs[0].id,
-          ...programsSnap.docs[0].data(),
-        } as AffiliateProgram);
+      if (programsRes.ok) {
+        const { programs } = await programsRes.json();
+        if (programs?.length) setProgram(programs[0] as AffiliateProgram);
       }
-      setCreatives(creativeSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Creative).filter((c) => c.status === "ready"));
-      setCopyVariants(copySnap.docs.map((d) => ({ id: d.id, ...d.data() }) as CopyVariant));
+
       setLoading(false);
     }
     load();

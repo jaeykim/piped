@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase/admin";
+import { adminAuth } from "@/lib/firebase/admin";
+import { prisma } from "@/lib/prisma";
 
-// Legacy endpoint - Nano Banana 2 generates synchronously,
-// so this just returns current Firestore status for backward compatibility
+// Legacy endpoint — Nano Banana 2 generates synchronously, but the client
+// still polls this for backward compat.
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get("authorization");
@@ -13,27 +14,24 @@ export async function GET(request: NextRequest) {
     await adminAuth.verifyIdToken(token);
 
     const creativeId = request.nextUrl.searchParams.get("creativeId");
-    const projectId = request.nextUrl.searchParams.get("projectId");
-
-    if (!creativeId || !projectId) {
+    if (!creativeId) {
       return NextResponse.json(
-        { error: "creativeId and projectId are required" },
+        { error: "creativeId is required" },
         { status: 400 }
       );
     }
 
-    const docSnap = await adminDb
-      .doc(`projects/${projectId}/creatives/${creativeId}`)
-      .get();
-
-    if (!docSnap.exists) {
+    const creative = await prisma.creative.findUnique({
+      where: { id: creativeId },
+      select: { status: true, imageUrl: true },
+    });
+    if (!creative) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const data = docSnap.data()!;
     return NextResponse.json({
-      status: data.status,
-      imageUrl: data.imageUrl || null,
+      status: creative.status,
+      imageUrl: creative.imageUrl || null,
     });
   } catch (error) {
     console.error("Status check error:", error);

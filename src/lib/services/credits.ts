@@ -1,5 +1,4 @@
-import { adminDb } from "@/lib/firebase/admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { prisma } from "@/lib/prisma";
 
 export type CreditAction =
   | "crawl"
@@ -21,13 +20,49 @@ export const CREDIT_COSTS: Record<string, number> = {
 };
 
 export async function getCredits(uid: string): Promise<number> {
-  const snap = await adminDb.doc(`users/${uid}`).get();
-  return snap.data()?.credits || 0;
+  const u = await prisma.user.findUnique({
+    where: { id: uid },
+    select: { credits: true },
+  });
+  return u?.credits ?? 0;
 }
 
 export async function hasEnoughCredits(uid: string, amount: number): Promise<boolean> {
-  const credits = await getCredits(uid);
-  return credits >= amount;
+  return (await getCredits(uid)) >= amount;
+}
+
+async function adjust(
+  uid: string,
+  delta: number,
+  action: CreditAction,
+  description?: string
+): Promise<number> {
+  return prisma.$transaction(async (tx) => {
+    const u = await tx.user.findUnique({
+      where: { id: uid },
+      select: { credits: true },
+    });
+    if (!u) throw new Error("user not found");
+    const current = u.credits;
+    if (delta < 0 && current + delta < 0) {
+      throw new Error(`Insufficient credits: have ${current}, need ${-delta}`);
+    }
+    const next = current + delta;
+    await tx.user.update({
+      where: { id: uid },
+      data: { credits: next },
+    });
+    await tx.creditHistory.create({
+      data: {
+        userId: uid,
+        amount: delta,
+        balance: next,
+        action,
+        description: description || action,
+      },
+    });
+    return next;
+  });
 }
 
 export async function deductCredits(
@@ -36,33 +71,7 @@ export async function deductCredits(
   action: CreditAction,
   description?: string
 ): Promise<number> {
-  const userRef = adminDb.doc(`users/${uid}`);
-
-  // Atomic transaction to prevent race conditions
-  const newBalance = await adminDb.runTransaction(async (tx) => {
-    const snap = await tx.get(userRef);
-    const current = snap.data()?.credits || 0;
-    if (current < amount) {
-      throw new Error(`Insufficient credits: have ${current}, need ${amount}`);
-    }
-    const updated = current - amount;
-    tx.update(userRef, {
-      credits: updated,
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-    return updated;
-  });
-
-  // Record history (outside transaction for performance)
-  await adminDb.collection(`users/${uid}/creditHistory`).add({
-    amount: -amount,
-    balance: newBalance,
-    action,
-    description: description || action,
-    createdAt: FieldValue.serverTimestamp(),
-  });
-
-  return newBalance;
+  return adjust(uid, -Math.abs(amount), action, description);
 }
 
 export async function addCredits(
@@ -71,34 +80,16 @@ export async function addCredits(
   action: CreditAction,
   description?: string
 ): Promise<number> {
-  const userRef = adminDb.doc(`users/${uid}`);
-
-  const newBalance = await adminDb.runTransaction(async (tx) => {
-    const snap = await tx.get(userRef);
-    const current = snap.data()?.credits || 0;
-    const updated = current + amount;
-    tx.update(userRef, {
-      credits: updated,
-      updatedAt: FieldValue.serverTimestamp(),
-    });
-    return updated;
-  });
-
-  await adminDb.collection(`users/${uid}/creditHistory`).add({
-    amount: +amount,
-    balance: newBalance,
-    action,
-    description: description || action,
-    createdAt: FieldValue.serverTimestamp(),
-  });
-
-  return newBalance;
+  return adjust(uid, Math.abs(amount), action, description);
 }
 
 /**
  * Middleware helper: check credits and return error response if insufficient
  */
-export async function requireCredits(uid: string, action: string): Promise<{ ok: boolean; error?: string; cost: number }> {
+export async function requireCredits(
+  uid: string,
+  action: string
+): Promise<{ ok: boolean; error?: string; cost: number }> {
   const cost = CREDIT_COSTS[action];
   if (!cost) return { ok: true, cost: 0 };
 
