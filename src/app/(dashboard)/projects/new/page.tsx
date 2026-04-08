@@ -66,7 +66,8 @@ export default function NewProjectPage() {
         Authorization: `Bearer ${token}`,
       };
 
-      // 1. Crawl + analyze the URL
+      // 1. Crawl + analyze the URL — server returns detectedLanguage so the
+      // next two steps generate copy in the site's actual language.
       setStatus(isKo ? "사이트 분석 중… (30초 정도)" : "Analyzing site… (~30s)");
       let res = await fetch("/api/crawl", {
         method: "POST",
@@ -76,16 +77,28 @@ export default function NewProjectPage() {
       if (!res.ok) {
         throw new Error((await res.json()).error || t.projects.analysisFailed);
       }
+      const crawlJson = await res.json();
+      const detected: "ko" | "ja" | "zh" | "en" =
+        crawlJson.detectedLanguage || (isKo ? "ko" : "en");
+      const langLabel = {
+        ko: "한국어",
+        ja: "日本語",
+        zh: "中文",
+        en: "English",
+      }[detected];
+      const countryLabel = {
+        ko: "대한민국",
+        ja: "日本",
+        zh: "中国",
+        en: "United States",
+      }[detected];
 
-      // 2. Generate copy variants
+      // 2. Generate copy variants in the detected language
       setStatus(isKo ? "광고 카피 생성 중…" : "Writing ad copy…");
       res = await fetch("/api/copy/generate", {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          projectId,
-          language: isKo ? "한국어" : "English",
-        }),
+        body: JSON.stringify({ projectId, language: langLabel }),
       });
       if (!res.ok) {
         throw new Error((await res.json()).error || "copy generation failed");
@@ -102,8 +115,8 @@ export default function NewProjectPage() {
           platform: "instagram",
           concept: "benefit-driven",
           subject: "graphic-card",
-          language: isKo ? "한국어" : "English",
-          country: isKo ? "대한민국" : "United States",
+          language: langLabel,
+          country: countryLabel,
         }),
       });
       // Creative gen failures aren't fatal — the wizard will show a "no

@@ -3,6 +3,7 @@ import { adminAuth } from "@/lib/firebase/admin";
 import { prisma } from "@/lib/prisma";
 import { crawlUrl } from "@/lib/services/crawler";
 import { analyzeWebsite } from "@/lib/services/analyzer";
+import { detectLanguage } from "@/lib/services/detect-language";
 import { requireCredits, deductCredits } from "@/lib/services/credits";
 
 export async function POST(request: NextRequest) {
@@ -101,8 +102,21 @@ export async function POST(request: NextRequest) {
 
     await deductCredits(uid, creditCheck.cost, "crawl", `Site analysis for ${url}`);
 
+    // Auto-detect the site language so the copy generator gets the right
+    // locale instead of always defaulting to the user's UI locale.
+    const detectedLanguage = detectLanguage(
+      [
+        analysis.productName,
+        analysis.valueProposition,
+        ...(analysis.keyFeatures || []),
+        ...(analysis.targetAudience || []),
+        analysis.extractedText?.slice(0, 500) ?? "",
+      ].join(" ")
+    );
+
     return NextResponse.json({
       success: true,
+      detectedLanguage,
       analysis: {
         productName: analysis.productName,
         valueProposition: analysis.valueProposition,

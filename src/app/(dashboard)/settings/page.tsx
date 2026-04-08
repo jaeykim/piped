@@ -281,11 +281,42 @@ export default function SettingsPage() {
     }
   }, [searchParams, toast, refreshProfile]);
 
+  type Tab = "credits" | "profile" | "integrations" | "payouts" | "security";
+  const [tab, setTab] = useState<Tab>("credits");
+  const tabs: { id: Tab; label: string }[] = [
+    { id: "credits", label: t.settings.creditsTitle },
+    { id: "profile", label: t.settings.profile },
+    { id: "integrations", label: t.settings.integrations },
+    { id: "payouts", label: t.settings.payoutTitle },
+    { id: "security", label: t.settings.security },
+  ];
+
   return (
     <div className="mx-auto max-w-2xl">
       <h1 className="text-2xl font-bold text-gray-900">{t.settings.title}</h1>
 
+      {/* Tab nav — horizontal scroll on mobile so all 5 tabs are reachable */}
+      <div className="mt-6 overflow-x-auto border-b border-gray-200">
+        <div className="flex gap-1 min-w-max">
+          {tabs.map((ti) => (
+            <button
+              key={ti.id}
+              onClick={() => setTab(ti.id)}
+              className={`whitespace-nowrap rounded-t-lg px-4 py-2 text-sm font-medium transition-colors ${
+                tab === ti.id
+                  ? "border-b-2 border-indigo-600 text-indigo-700"
+                  : "text-gray-500 hover:text-gray-900"
+              }`}
+            >
+              {ti.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Credits */}
+      {tab === "credits" && (<>
+
         <Card className="mt-6">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -398,8 +429,10 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+      </>)}
 
       {/* Profile */}
+      {tab === "profile" && (
       <Card className="mt-6">
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -424,8 +457,10 @@ export default function SettingsPage() {
           </Button>
         </CardContent>
       </Card>
+      )}
 
       {/* Integrations */}
+      {tab === "integrations" && (
         <Card className="mt-6">
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -540,8 +575,10 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+      )}
 
       {/* Crypto Wallet (for affiliate payouts) */}
+      {tab === "payouts" && (
       <Card className="mt-6">
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -591,8 +628,10 @@ export default function SettingsPage() {
           </Button>
         </CardContent>
       </Card>
+      )}
 
       {/* Security */}
+      {tab === "security" && (
       <Card className="mt-6">
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -615,6 +654,7 @@ export default function SettingsPage() {
           </Button>
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }

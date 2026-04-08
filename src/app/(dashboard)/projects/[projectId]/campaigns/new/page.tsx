@@ -389,10 +389,10 @@ export default function NewCampaignPage() {
     <div className="mx-auto max-w-3xl">
       <h1 className="text-2xl font-bold text-gray-900">{t.campaigns.createCampaign}</h1>
 
-      {/* Step indicator */}
-      <div className="mt-6 flex items-center gap-2">
+      {/* Step indicator — labels hide on mobile to fit 4 steps */}
+      <div className="mt-6 flex items-center gap-2 overflow-x-auto pb-1">
         {steps.map((s, i) => (
-          <div key={s.id} className="flex items-center">
+          <div key={s.id} className="flex shrink-0 items-center">
             <div
               className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium ${
                 i < currentStepIndex
@@ -409,7 +409,7 @@ export default function NewCampaignPage() {
               )}
             </div>
             <span
-              className={`ml-2 text-sm ${
+              className={`ml-2 hidden text-sm sm:inline ${
                 i === currentStepIndex
                   ? "font-medium text-gray-900"
                   : "text-gray-400"
@@ -417,8 +417,14 @@ export default function NewCampaignPage() {
             >
               {s.label}
             </span>
+            {/* current step label always visible (even on mobile) */}
+            {i === currentStepIndex && (
+              <span className="ml-2 text-sm font-medium text-gray-900 sm:hidden">
+                {s.label}
+              </span>
+            )}
             {i < steps.length - 1 && (
-              <div className="mx-3 h-px w-8 bg-gray-200" />
+              <div className="mx-2 h-px w-4 bg-gray-200 sm:mx-3 sm:w-8" />
             )}
           </div>
         ))}
