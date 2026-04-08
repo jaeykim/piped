@@ -11,10 +11,11 @@ export function middleware(request: NextRequest) {
     publicPaths.some((p) => pathname === p || pathname.startsWith(p + "/")) ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/auth/") ||
+    pathname.startsWith("/api/cron/") ||
     pathname.startsWith("/api/payments/webhook") ||
     pathname.startsWith("/api/affiliates/track") ||
     pathname.startsWith("/api/affiliates/convert") ||
-    pathname.startsWith("/api/affiliates/test-convert") ||
+    pathname.startsWith("/api/affiliates/programs") ||
     pathname.includes(".")
   ) {
     return NextResponse.next();

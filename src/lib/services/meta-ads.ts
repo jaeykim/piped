@@ -329,6 +329,32 @@ export async function updateAdStatus(
   return response.json();
 }
 
+// ─── Budget Update ───
+
+/**
+ * Update the daily budget on a Meta ad set. Meta stores budgets in the
+ * account currency's minor units (cents for USD).
+ */
+export async function updateAdSetDailyBudget(
+  adSetId: string,
+  accessToken: string,
+  dailyBudgetUsd: number
+) {
+  const response = await fetch(`${META_BASE_URL}/${adSetId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      daily_budget: Math.round(dailyBudgetUsd * 100),
+      access_token: accessToken,
+    }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || "Failed to update daily budget");
+  }
+  return response.json();
+}
+
 // ─── List Campaigns ───
 
 export async function listCampaigns(
