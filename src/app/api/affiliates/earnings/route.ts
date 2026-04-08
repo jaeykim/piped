@@ -44,6 +44,9 @@ export async function GET(request: NextRequest) {
       })),
     });
   } catch (error) {
+    if (typeof (error as { code?: string })?.code === "string" && (error as { code: string }).code.startsWith("auth/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     console.error("Earnings fetch error:", error);
     return NextResponse.json(
       { error: "Failed to fetch earnings" },

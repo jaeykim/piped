@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Piped healthcheck every 5 minutes
+Requires=piped-healthcheck.service
+
+[Timer]
+OnBootSec=60s
+OnUnitActiveSec=5min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

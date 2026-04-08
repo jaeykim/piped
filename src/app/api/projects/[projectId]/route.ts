@@ -41,6 +41,9 @@ export async function GET(
 
     return NextResponse.json({ project });
   } catch (error) {
+    if (typeof (error as { code?: string })?.code === "string" && (error as { code: string }).code.startsWith("auth/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "fetch failed" },
       { status: 500 }
@@ -83,6 +86,9 @@ export async function PATCH(
     });
     return NextResponse.json({ project });
   } catch (error) {
+    if (typeof (error as { code?: string })?.code === "string" && (error as { code: string }).code.startsWith("auth/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "update failed" },
       { status: 500 }
@@ -114,6 +120,9 @@ export async function DELETE(
     await prisma.project.delete({ where: { id: projectId } });
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (typeof (error as { code?: string })?.code === "string" && (error as { code: string }).code.startsWith("auth/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Delete failed" },
       { status: 500 }

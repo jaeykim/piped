@@ -28,6 +28,9 @@ export async function POST(request: NextRequest) {
   try {
     event = getStripe().webhooks.constructEvent(body, sig, webhookSecret);
   } catch (err) {
+    if (typeof (err as { code?: string })?.code === "string" && (err as { code: string }).code.startsWith("auth/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     console.error("Webhook signature verification failed:", err);
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }

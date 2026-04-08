@@ -47,6 +47,9 @@ export async function POST(request: NextRequest) {
       status: statusMap[action as keyof typeof statusMap],
     });
   } catch (error) {
+    if (typeof (error as { code?: string })?.code === "string" && (error as { code: string }).code.startsWith("auth/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed" },
       { status: 500 }

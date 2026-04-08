@@ -18,6 +18,9 @@ export async function GET(
     }
     return NextResponse.json({ program });
   } catch (error) {
+    if (typeof (error as { code?: string })?.code === "string" && (error as { code: string }).code.startsWith("auth/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "fetch failed" },
       { status: 500 }

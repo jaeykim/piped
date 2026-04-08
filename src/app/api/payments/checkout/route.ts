@@ -56,6 +56,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ url: session.url });
   } catch (error) {
+    if (typeof (error as { code?: string })?.code === "string" && (error as { code: string }).code.startsWith("auth/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     console.error("Checkout error:", error);
     const message = error instanceof Error ? error.message : "Checkout failed";
     if (message === "STRIPE_NOT_CONFIGURED") {

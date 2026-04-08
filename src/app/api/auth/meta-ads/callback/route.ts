@@ -63,6 +63,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.redirect(`${baseUrl}/settings?meta_ads=success`);
   } catch (err) {
+    if (typeof (err as { code?: string })?.code === "string" && (err as { code: string }).code.startsWith("auth/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     console.error("Meta callback error:", err);
     return NextResponse.redirect(`${baseUrl}/settings?meta_ads=error&reason=server`);
   }

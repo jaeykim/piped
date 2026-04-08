@@ -45,6 +45,9 @@ export async function POST(request: NextRequest) {
     }
     throw new Error("No video output");
   } catch (error) {
+    if (typeof (error as { code?: string })?.code === "string" && (error as { code: string }).code.startsWith("auth/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const message = error instanceof Error ? error.message : String(error);
     console.error("Video generation error:", message);
     return NextResponse.json({ error: message }, { status: 500 });

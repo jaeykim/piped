@@ -11,6 +11,9 @@ export async function GET(request: NextRequest) {
     });
     return NextResponse.json({ programs });
   } catch (error) {
+    if (typeof (error as { code?: string })?.code === "string" && (error as { code: string }).code.startsWith("auth/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     console.error("Error fetching programs:", error);
     return NextResponse.json(
       { error: "Failed to fetch programs" },
@@ -67,6 +70,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, programId: program.id });
   } catch (error) {
+    if (typeof (error as { code?: string })?.code === "string" && (error as { code: string }).code.startsWith("auth/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     console.error("Error creating program:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Creation failed" },

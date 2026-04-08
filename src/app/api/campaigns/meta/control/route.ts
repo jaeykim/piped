@@ -55,6 +55,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, adId, status });
   } catch (error) {
+    if (typeof (error as { code?: string })?.code === "string" && (error as { code: string }).code.startsWith("auth/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to update ad" },
       { status: 500 }

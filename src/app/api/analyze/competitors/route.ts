@@ -152,6 +152,9 @@ Include 3-5 competitors and 3 recommended ad angles. Be specific and actionable.
 
     return NextResponse.json(result);
   } catch (error) {
+    if (typeof (error as { code?: string })?.code === "string" && (error as { code: string }).code.startsWith("auth/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     console.error("Competitor analysis error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Analysis failed" },

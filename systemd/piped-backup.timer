@@ -1,0 +1,13 @@
+[Unit]
+Description=Run Piped Postgres backup nightly at 03:30 KST
+Requires=piped-backup.service
+
+[Timer]
+# 03:30 KST = 18:30 UTC. Persistent=true means a missed window (reboot,
+# downtime) will trigger the backup as soon as the box is back up.
+OnCalendar=*-*-* 18:30:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

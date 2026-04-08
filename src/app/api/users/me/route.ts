@@ -52,6 +52,9 @@ export async function GET(request: NextRequest) {
     if (!u) return NextResponse.json({ user: null }, { status: 200 });
     return NextResponse.json({ user: shape(u) });
   } catch (error) {
+    if (typeof (error as { code?: string })?.code === "string" && (error as { code: string }).code.startsWith("auth/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "fetch failed" },
       { status: 500 }
@@ -93,6 +96,9 @@ export async function PATCH(request: NextRequest) {
     });
     return NextResponse.json({ user: shape(u) });
   } catch (error) {
+    if (typeof (error as { code?: string })?.code === "string" && (error as { code: string }).code.startsWith("auth/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "update failed" },
       { status: 500 }
@@ -129,6 +135,9 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ user: shape(u) });
   } catch (error) {
+    if (typeof (error as { code?: string })?.code === "string" && (error as { code: string }).code.startsWith("auth/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "create failed" },
       { status: 500 }

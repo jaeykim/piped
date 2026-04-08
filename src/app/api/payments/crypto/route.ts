@@ -57,6 +57,9 @@ export async function POST(request: NextRequest) {
       uid,
     });
   } catch (error) {
+    if (typeof (error as { code?: string })?.code === "string" && (error as { code: string }).code.startsWith("auth/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const message = error instanceof Error ? error.message : String(error);
     console.error("Crypto payment error:", message);
     return NextResponse.json({ error: message }, { status: 500 });
@@ -92,6 +95,9 @@ export async function GET(request: NextRequest) {
     const status = await client.verifyPayment(paymentId);
     return NextResponse.json({ status: status.status, confirmed: false });
   } catch (error) {
+    if (typeof (error as { code?: string })?.code === "string" && (error as { code: string }).code.startsWith("auth/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Status check failed" },
       { status: 500 }
