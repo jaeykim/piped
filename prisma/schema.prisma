@@ -235,9 +235,16 @@ model Campaign {
   // Targeting
   ageMin               Int               @default(18)
   ageMax               Int               @default(65)
-  genders              String[]
+  genders              String[] // ["male", "female", "all"]
   locations            String[]
   interests            String[]
+  language             String? // primary ad language code (e.g. "ko", "en")
+  // Placements + bidding
+  placements           String[] // ["instagram_feed","instagram_stories","facebook_feed",...]
+  bidStrategy          String?  // "LOWEST_COST_WITHOUT_CAP" | "COST_CAP" | "LOWEST_COST_WITH_BID_CAP"
+  // Schedule
+  scheduleStart        DateTime?
+  scheduleEnd          DateTime?
   // Autopilot
   targetRoas           Float?
   optimizationEnabled  Boolean           @default(false)

@@ -71,6 +71,28 @@ interface CampaignSummary {
   totals: Totals;
 }
 
+interface CampaignSettings {
+  id: string;
+  name: string;
+  objective: string;
+  budget: { amount: number; currency: string; type: string };
+  targeting: {
+    ageMin: number;
+    ageMax: number;
+    genders: string[];
+    locations: string[];
+    interests: string[];
+    language?: string | null;
+  };
+  placements: string[];
+  bidStrategy: string | null;
+  scheduleStart: string | null;
+  scheduleEnd: string | null;
+  targetRoas: number | null;
+  optimizationEnabled: boolean;
+  platformCampaignId: string | null;
+}
+
 interface InsightsResponse {
   connected: boolean;
   days: number;
@@ -122,6 +144,8 @@ export default function DashboardPage() {
   const [days, setDays] = useState(14);
   const [data, setData] = useState<InsightsResponse | null>(null);
   const [logs, setLogs] = useState<OptimizationLogEntry[]>([]);
+  const [settings, setSettings] = useState<Record<string, CampaignSettings>>({});
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
@@ -136,9 +160,10 @@ export default function DashboardPage() {
     try {
       const token = await getAuth_().currentUser?.getIdToken();
       const headers = { Authorization: `Bearer ${token}` };
-      const [insightsRes, logsRes] = await Promise.all([
+      const [insightsRes, logsRes, campaignsRes] = await Promise.all([
         fetch(`/api/campaigns/meta/insights?days=${days}`, { headers }),
         fetch(`/api/optimization-logs?limit=30`, { headers }),
+        fetch(`/api/campaigns`, { headers }),
       ]);
       if (!insightsRes.ok) throw new Error("insights failed");
       const json = (await insightsRes.json()) as InsightsResponse;
@@ -146,6 +171,14 @@ export default function DashboardPage() {
       if (logsRes.ok) {
         const lj = await logsRes.json();
         setLogs((lj.logs || []) as OptimizationLogEntry[]);
+      }
+      if (campaignsRes.ok) {
+        const cj = await campaignsRes.json();
+        const map: Record<string, CampaignSettings> = {};
+        for (const c of cj.campaigns || []) {
+          map[c.id] = c;
+        }
+        setSettings(map);
       }
     } catch {
       setError(true);
@@ -162,20 +195,15 @@ export default function DashboardPage() {
     campaignId: string,
     currentStatus: string
   ) => {
+    const platformId = settings[campaignId]?.platformCampaignId;
+    if (!platformId) {
+      toast("error", isKo ? "platform id 없음" : "missing platform id");
+      return;
+    }
     setTogglingId(campaignId);
     const next = currentStatus === "active" ? "PAUSED" : "ACTIVE";
     try {
       const token = await getAuth_().currentUser?.getIdToken();
-      // We need the platform campaign ID — fetch the campaign row
-      const cRes = await fetch(`/api/campaigns`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!cRes.ok) throw new Error("fetch campaigns failed");
-      const { campaigns } = await cRes.json();
-      const c = campaigns.find(
-        (x: { id: string; platformCampaignId?: string }) => x.id === campaignId
-      );
-      if (!c?.platformCampaignId) throw new Error("missing platform id");
       const res = await fetch("/api/campaigns/meta/control", {
         method: "POST",
         headers: {
@@ -184,7 +212,7 @@ export default function DashboardPage() {
         },
         body: JSON.stringify({
           campaignDocId: campaignId,
-          adId: c.platformCampaignId,
+          adId: platformId,
           status: next,
         }),
       });
@@ -676,7 +704,24 @@ export default function DashboardPage() {
                       </ResponsiveContainer>
                     </div>
 
-                    <div className="mt-3 flex justify-end">
+                    <div className="mt-3 flex items-center justify-between">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedId(
+                            expandedId === c.campaignId ? null : c.campaignId
+                          )
+                        }
+                        className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                      >
+                        {expandedId === c.campaignId
+                          ? isKo
+                            ? "▴ 설정 숨기기"
+                            : "▴ Hide settings"
+                          : isKo
+                          ? "▾ 설정 보기"
+                          : "▾ Show settings"}
+                      </button>
                       <Button
                         size="sm"
                         variant="outline"
@@ -698,6 +743,118 @@ export default function DashboardPage() {
                         )}
                       </Button>
                     </div>
+
+                    {expandedId === c.campaignId && settings[c.campaignId] && (
+                      <div className="mt-3 grid gap-2 rounded-lg bg-gray-50 p-3 text-[11px]">
+                        {(() => {
+                          const s = settings[c.campaignId];
+                          const rows: { label: string; value: string }[] = [
+                            {
+                              label: isKo ? "목표" : "Objective",
+                              value: s.objective,
+                            },
+                            {
+                              label: isKo ? "예산" : "Budget",
+                              value: `${fmtMoney(s.budget.amount)}/${
+                                s.budget.type === "daily"
+                                  ? isKo
+                                    ? "일"
+                                    : "day"
+                                  : isKo
+                                  ? "총"
+                                  : "lifetime"
+                              }`,
+                            },
+                            {
+                              label: isKo ? "연령" : "Age",
+                              value: `${s.targeting.ageMin}–${s.targeting.ageMax}`,
+                            },
+                            {
+                              label: isKo ? "성별" : "Gender",
+                              value:
+                                s.targeting.genders.length === 0 ||
+                                s.targeting.genders.includes("all")
+                                  ? isKo
+                                    ? "전체"
+                                    : "All"
+                                  : s.targeting.genders.join(", "),
+                            },
+                            {
+                              label: isKo ? "지역" : "Locations",
+                              value: s.targeting.locations.join(", ") || "—",
+                            },
+                            {
+                              label: isKo ? "관심사" : "Interests",
+                              value:
+                                s.targeting.interests.length > 0
+                                  ? s.targeting.interests.join(", ")
+                                  : isKo
+                                  ? "(설정 안 함)"
+                                  : "(none)",
+                            },
+                            {
+                              label: isKo ? "게재 위치" : "Placements",
+                              value:
+                                s.placements.length > 0
+                                  ? s.placements
+                                      .map((p) =>
+                                        p
+                                          .replace("instagram_", "IG ")
+                                          .replace("facebook_", "FB ")
+                                      )
+                                      .join(", ")
+                                  : isKo
+                                  ? "(자동)"
+                                  : "(auto)",
+                            },
+                            {
+                              label: isKo ? "입찰" : "Bidding",
+                              value:
+                                s.bidStrategy
+                                  ?.replace("LOWEST_COST_WITHOUT_CAP", isKo ? "최저 비용" : "Lowest cost")
+                                  .replace("LOWEST_COST_WITH_BID_CAP", isKo ? "입찰 상한" : "Bid cap")
+                                  .replace("COST_CAP", isKo ? "비용 상한" : "Cost cap") ||
+                                (isKo ? "최저 비용" : "Lowest cost"),
+                            },
+                            {
+                              label: isKo ? "일정" : "Schedule",
+                              value:
+                                s.scheduleStart || s.scheduleEnd
+                                  ? `${s.scheduleStart?.slice(0, 10) || "—"} → ${s.scheduleEnd?.slice(0, 10) || (isKo ? "계속" : "ongoing")}`
+                                  : isKo
+                                  ? "계속 운영"
+                                  : "Continuous",
+                            },
+                            {
+                              label: isKo ? "목표 ROAS" : "Target ROAS",
+                              value:
+                                s.targetRoas != null
+                                  ? `${s.targetRoas}x ${
+                                      s.optimizationEnabled
+                                        ? isKo
+                                          ? "(자동화 ON)"
+                                          : "(autopilot ON)"
+                                        : ""
+                                    }`
+                                  : isKo
+                                  ? "(설정 안 함)"
+                                  : "(not set)",
+                            },
+                          ];
+                          return rows.map((r) => (
+                            <div
+                              key={r.label}
+                              className="flex justify-between gap-2"
+                            >
+                              <span className="text-gray-500">{r.label}</span>
+                              <span className="text-right font-medium text-gray-900">
+                                {r.value}
+                              </span>
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               );

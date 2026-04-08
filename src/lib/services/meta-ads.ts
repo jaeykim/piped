@@ -10,15 +10,67 @@ interface MetaCampaignConfig {
   targeting: {
     ageMin: number;
     ageMax: number;
+    /** Meta gender codes: 1 = male, 2 = female. Empty/undefined = all. */
     genders: number[];
     geoLocations: { countries: string[] };
     interests?: { id: string; name: string }[];
+    /** Targeting locales — Meta locale IDs. Empty = all. */
+    locales?: number[];
   };
+  /** Meta placement keys, e.g. instagram_feed, instagram_stories, facebook_feed. */
+  placements?: string[];
+  /** Optional ad set bid strategy. Defaults to LOWEST_COST_WITHOUT_CAP. */
+  bidStrategy?:
+    | "LOWEST_COST_WITHOUT_CAP"
+    | "LOWEST_COST_WITH_BID_CAP"
+    | "COST_CAP";
+  /** Schedule. Pass undefined for "run continuously". */
+  scheduleStart?: string; // ISO timestamp
+  scheduleEnd?: string;
   adCreativeUrl: string;
   primaryText: string;
   headline: string;
   linkDescription: string;
   destinationUrl: string;
+}
+
+// Map our human-friendly placement keys to Meta's publisher_platforms /
+// {facebook,instagram}_positions / device_platforms structure.
+function buildPlacementSpec(placements: string[] | undefined) {
+  if (!placements || placements.length === 0) return undefined;
+  const fbPositions: string[] = [];
+  const igPositions: string[] = [];
+  const publisherPlatforms = new Set<string>();
+  for (const p of placements) {
+    if (p === "facebook_feed") {
+      publisherPlatforms.add("facebook");
+      fbPositions.push("feed");
+    } else if (p === "facebook_stories") {
+      publisherPlatforms.add("facebook");
+      fbPositions.push("story");
+    } else if (p === "facebook_reels") {
+      publisherPlatforms.add("facebook");
+      fbPositions.push("facebook_reels");
+    } else if (p === "instagram_feed") {
+      publisherPlatforms.add("instagram");
+      igPositions.push("stream");
+    } else if (p === "instagram_stories") {
+      publisherPlatforms.add("instagram");
+      igPositions.push("story");
+    } else if (p === "instagram_reels") {
+      publisherPlatforms.add("instagram");
+      igPositions.push("reels");
+    } else if (p === "instagram_explore") {
+      publisherPlatforms.add("instagram");
+      igPositions.push("explore");
+    }
+  }
+  const spec: Record<string, unknown> = {
+    publisher_platforms: Array.from(publisherPlatforms),
+  };
+  if (fbPositions.length) spec.facebook_positions = fbPositions;
+  if (igPositions.length) spec.instagram_positions = igPositions;
+  return spec;
 }
 
 async function metaApiCall(
@@ -69,26 +121,44 @@ export async function createMetaCampaign(config: MetaCampaignConfig) {
   );
 
   // 2. Create Ad Set
+  const placementSpec = buildPlacementSpec(config.placements);
+  const targetingObj: Record<string, unknown> = {
+    age_min: config.targeting.ageMin,
+    age_max: config.targeting.ageMax,
+    geo_locations: config.targeting.geoLocations,
+  };
+  // Only include genders if specified (empty = all genders, which is the
+  // Meta default and avoiding the field is safer than passing []).
+  if (config.targeting.genders.length > 0) {
+    targetingObj.genders = config.targeting.genders;
+  }
+  if (config.targeting.interests?.length) {
+    targetingObj.flexible_spec = [{ interests: config.targeting.interests }];
+  }
+  if (config.targeting.locales?.length) {
+    targetingObj.locales = config.targeting.locales;
+  }
+  if (placementSpec) {
+    Object.assign(targetingObj, placementSpec);
+  }
+
+  const adSetPayload: Record<string, unknown> = {
+    name: `${config.name} - Ad Set`,
+    campaign_id: campaign.id,
+    daily_budget: Math.round(config.dailyBudget * 100), // cents
+    billing_event: "IMPRESSIONS",
+    optimization_goal: "LINK_CLICKS",
+    bid_strategy: config.bidStrategy ?? "LOWEST_COST_WITHOUT_CAP",
+    targeting: targetingObj,
+    status: "PAUSED",
+  };
+  if (config.scheduleStart) adSetPayload.start_time = config.scheduleStart;
+  if (config.scheduleEnd) adSetPayload.end_time = config.scheduleEnd;
+
   const adSet = await metaApiCall(
     `/act_${adAccountId}/adsets`,
     accessToken,
-    {
-      name: `${config.name} - Ad Set`,
-      campaign_id: campaign.id,
-      daily_budget: config.dailyBudget * 100, // cents
-      billing_event: "IMPRESSIONS",
-      optimization_goal: "LINK_CLICKS",
-      targeting: {
-        age_min: config.targeting.ageMin,
-        age_max: config.targeting.ageMax,
-        genders: config.targeting.genders,
-        geo_locations: config.targeting.geoLocations,
-        flexible_spec: config.targeting.interests
-          ? [{ interests: config.targeting.interests }]
-          : undefined,
-      },
-      status: "PAUSED",
-    }
+    adSetPayload
   );
 
   // 3. Create Ad Creative

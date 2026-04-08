@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 import {
   ArrowLeft,
   ArrowRight,
@@ -132,6 +133,26 @@ export default function NewCampaignPage() {
   const [targetRoas, setTargetRoas] = useState<number>(3);
   const [optimizationEnabled, setOptimizationEnabled] = useState<boolean>(true);
   const [campaignName, setCampaignName] = useState("");
+
+  // Advanced (collapsed by default — beginners default to "easy" mode).
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [campaignObjective, setCampaignObjective] = useState<
+    "traffic" | "conversions" | "awareness"
+  >("traffic");
+  const [genderTarget, setGenderTarget] = useState<"all" | "male" | "female">(
+    "all"
+  );
+  const [placements, setPlacements] = useState<string[]>([
+    "instagram_feed",
+    "instagram_stories",
+    "instagram_reels",
+    "facebook_feed",
+  ]);
+  const [bidStrategy, setBidStrategy] = useState<
+    "LOWEST_COST_WITHOUT_CAP" | "LOWEST_COST_WITH_BID_CAP" | "COST_CAP"
+  >("LOWEST_COST_WITHOUT_CAP");
+  const [scheduleStart, setScheduleStart] = useState<string>(""); // YYYY-MM-DD
+  const [scheduleEnd, setScheduleEnd] = useState<string>("");
   const [adBalance, setAdBalance] = useState<{ connected: boolean; balance: number | null; amountSpent: number | null; currency?: string; loading: boolean }>({ connected: false, balance: null, amountSpent: null, loading: false });
 
   // AI-recommended daily budget range (rounded to $5 increments)
@@ -268,14 +289,23 @@ export default function NewCampaignPage() {
       const body: Record<string, unknown> = {
         projectId,
         name: campaignName,
-        objective: "traffic",
+        objective: campaignObjective,
         dailyBudget: dailyBudget,
         targeting: {
           ageMin: targeting.ageMin,
           ageMax: targeting.ageMax,
+          genders: [genderTarget],
           locations: targeting.locations,
           interests: targeting.interests,
         },
+        placements,
+        bidStrategy,
+        scheduleStart: scheduleStart
+          ? new Date(scheduleStart).toISOString()
+          : undefined,
+        scheduleEnd: scheduleEnd
+          ? new Date(scheduleEnd).toISOString()
+          : undefined,
       };
 
       if (platform === "meta") {
@@ -768,6 +798,212 @@ export default function NewCampaignPage() {
                     );
                   })}
                 </div>
+              </div>
+
+              {/* ─── Advanced (collapsed by default) ─── */}
+              <div className="border-t border-gray-100 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced((v) => !v)}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700"
+                >
+                  <span>{showAdvanced ? "▾" : "▸"}</span>
+                  {isKo ? "고급 설정" : "Advanced settings"}
+                  <InfoTooltip
+                    text={
+                      isKo
+                        ? "성별, 광고 게재 위치, 캠페인 목표, 입찰 전략, 일정. 처음이면 그냥 두세요 — 스마트 기본값이 자동으로 잘 굴러가요."
+                        : "Gender, placements, objective, bid strategy, schedule. First time? Leave them — the smart defaults already work well."
+                    }
+                  />
+                </button>
+
+                {showAdvanced && (
+                  <div className="mt-4 space-y-4">
+                    {/* Objective */}
+                    <div>
+                      <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1.5">
+                        {isKo ? "캠페인 목표" : "Campaign objective"}
+                        <InfoTooltip
+                          text={
+                            isKo
+                              ? "메타가 누구한테 광고를 보여줄지 결정하는 기준. Traffic = 클릭 많이 나오는 사람한테, Conversions = 구매 가능성 높은 사람한테, Awareness = 가능한 많은 사람한테."
+                              : "Tells Meta who to show your ad to. Traffic = people who click. Conversions = people likely to buy. Awareness = reach as many as possible."
+                          }
+                        />
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(
+                          [
+                            { id: "traffic", label: isKo ? "트래픽" : "Traffic" },
+                            { id: "conversions", label: isKo ? "전환" : "Conversions" },
+                            { id: "awareness", label: isKo ? "인지도" : "Awareness" },
+                          ] as const
+                        ).map((o) => (
+                          <button
+                            key={o.id}
+                            type="button"
+                            onClick={() => setCampaignObjective(o.id)}
+                            className={`rounded-lg border-2 px-3 py-2 text-xs font-medium transition-colors ${
+                              campaignObjective === o.id
+                                ? "border-indigo-600 bg-indigo-50 text-indigo-700"
+                                : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                            }`}
+                          >
+                            {o.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Gender */}
+                    <div>
+                      <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1.5">
+                        {isKo ? "성별" : "Gender"}
+                        <InfoTooltip
+                          text={
+                            isKo
+                              ? "광고를 어떤 성별에게 보여줄지. '전체'가 기본이고, 제품이 명확하게 한 성별 전용일 때만 좁히세요."
+                              : "Which gender to target. Default is All — only narrow if your product is clearly for one gender."
+                          }
+                        />
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(
+                          [
+                            { id: "all", label: isKo ? "전체" : "All" },
+                            { id: "male", label: isKo ? "남성" : "Male" },
+                            { id: "female", label: isKo ? "여성" : "Female" },
+                          ] as const
+                        ).map((g) => (
+                          <button
+                            key={g.id}
+                            type="button"
+                            onClick={() => setGenderTarget(g.id)}
+                            className={`rounded-lg border-2 px-3 py-2 text-xs font-medium transition-colors ${
+                              genderTarget === g.id
+                                ? "border-indigo-600 bg-indigo-50 text-indigo-700"
+                                : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                            }`}
+                          >
+                            {g.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Placements */}
+                    <div>
+                      <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1.5">
+                        {isKo ? "광고 게재 위치" : "Placements"}
+                        <InfoTooltip
+                          text={
+                            isKo
+                              ? "어디에 광고가 뜰지. Instagram Feed/Stories/Reels는 보통 효율 좋고, Facebook Feed는 도달이 큼. 모르겠으면 기본값(전부 켜짐)이 가장 안전해요."
+                              : "Where the ad shows up. Instagram Feed/Stories/Reels usually performs best; Facebook Feed has the most reach. The default (all on) is the safest pick."
+                          }
+                        />
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(
+                          [
+                            { id: "instagram_feed", label: "📷 IG Feed" },
+                            { id: "instagram_stories", label: "📷 IG Stories" },
+                            { id: "instagram_reels", label: "📷 IG Reels" },
+                            { id: "facebook_feed", label: "📘 FB Feed" },
+                            { id: "facebook_stories", label: "📘 FB Stories" },
+                            { id: "facebook_reels", label: "📘 FB Reels" },
+                          ]
+                        ).map((p) => {
+                          const on = placements.includes(p.id);
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() =>
+                                setPlacements(
+                                  on
+                                    ? placements.filter((x) => x !== p.id)
+                                    : [...placements, p.id]
+                                )
+                              }
+                              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                                on
+                                  ? "border-indigo-600 bg-indigo-600 text-white"
+                                  : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                              }`}
+                            >
+                              {p.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Bid strategy */}
+                    <div>
+                      <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1.5">
+                        {isKo ? "입찰 전략" : "Bid strategy"}
+                        <InfoTooltip
+                          text={
+                            isKo
+                              ? "메타가 다른 광고주들과 경매할 때 어떻게 베팅할지. 'Lowest cost'는 메타가 알아서 가장 싼 결과를 찾고, Cost cap은 평균 비용 상한, Bid cap은 입찰 상한. 잘 모르면 기본값."
+                              : "How Meta bids in the ad auction. Lowest cost lets Meta find cheapest results, Cost cap = average cost ceiling, Bid cap = max bid. Stick with default if unsure."
+                          }
+                        />
+                      </label>
+                      <select
+                        value={bidStrategy}
+                        onChange={(e) =>
+                          setBidStrategy(
+                            e.target.value as typeof bidStrategy
+                          )
+                        }
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+                      >
+                        <option value="LOWEST_COST_WITHOUT_CAP">
+                          {isKo ? "최저 비용 (추천)" : "Lowest cost (recommended)"}
+                        </option>
+                        <option value="LOWEST_COST_WITH_BID_CAP">
+                          {isKo ? "입찰 상한" : "Bid cap"}
+                        </option>
+                        <option value="COST_CAP">
+                          {isKo ? "비용 상한" : "Cost cap"}
+                        </option>
+                      </select>
+                    </div>
+
+                    {/* Schedule */}
+                    <div>
+                      <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1.5">
+                        {isKo ? "일정" : "Schedule"}
+                        <InfoTooltip
+                          text={
+                            isKo
+                              ? "광고가 언제부터 언제까지 돌아갈지. 비워두면 시작하는 즉시 돌고, 끝없이 계속됩니다."
+                              : "When the ad should run. Leave blank to start immediately and run continuously."
+                          }
+                        />
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="date"
+                          value={scheduleStart}
+                          onChange={(e) => setScheduleStart(e.target.value)}
+                          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+                          placeholder={isKo ? "시작일" : "Start"}
+                        />
+                        <input
+                          type="date"
+                          value={scheduleEnd}
+                          onChange={(e) => setScheduleEnd(e.target.value)}
+                          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
+                          placeholder={isKo ? "종료일" : "End"}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

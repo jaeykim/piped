@@ -3,6 +3,15 @@ import { adminAuth } from "@/lib/firebase/admin";
 import { prisma } from "@/lib/prisma";
 import { createMetaCampaign } from "@/lib/services/meta-ads";
 
+// Map our friendly gender labels → Meta's numeric codes.
+function gendersToMeta(g: string[]): number[] {
+  if (!g.length || g.includes("all")) return []; // empty = all
+  const out: number[] = [];
+  if (g.includes("male")) out.push(1);
+  if (g.includes("female")) out.push(2);
+  return out;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get("authorization");
@@ -20,6 +29,11 @@ export async function POST(request: NextRequest) {
       objective,
       dailyBudget,
       targeting,
+      placements,
+      bidStrategy,
+      scheduleStart,
+      scheduleEnd,
+      language,
       creativeUrl,
       primaryText,
       headline,
@@ -52,9 +66,13 @@ export async function POST(request: NextRequest) {
       targeting: {
         ageMin: targeting?.ageMin ?? 18,
         ageMax: targeting?.ageMax ?? 65,
-        genders: targeting?.genders ?? [],
+        genders: gendersToMeta(targeting?.genders ?? []),
         geoLocations: { countries: targeting?.locations ?? ["US"] },
       },
+      placements: Array.isArray(placements) ? placements : undefined,
+      bidStrategy: bidStrategy ?? undefined,
+      scheduleStart: scheduleStart ?? undefined,
+      scheduleEnd: scheduleEnd ?? undefined,
       adCreativeUrl: creativeUrl,
       primaryText,
       headline,
@@ -81,6 +99,11 @@ export async function POST(request: NextRequest) {
         genders: (targeting?.genders ?? []).map(String),
         locations: (targeting?.locations ?? []).map(String),
         interests: (targeting?.interests ?? []).map(String),
+        language: language ?? null,
+        placements: Array.isArray(placements) ? placements : [],
+        bidStrategy: bidStrategy ?? null,
+        scheduleStart: scheduleStart ? new Date(scheduleStart) : null,
+        scheduleEnd: scheduleEnd ? new Date(scheduleEnd) : null,
         targetRoas: typeof targetRoas === "number" ? targetRoas : null,
         optimizationEnabled: !!optimizationEnabled,
       },
