@@ -71,6 +71,8 @@ export default function NewCampaignPage() {
   const [monthlyBudget, setMonthlyBudget] = useState(500);
   const [dailyBudget, setDailyBudget] = useState(15);
   const [budgetMode, setBudgetMode] = useState<"fixed" | "flexible">("fixed");
+  const [targetRoas, setTargetRoas] = useState<number>(3);
+  const [optimizationEnabled, setOptimizationEnabled] = useState<boolean>(true);
   const [campaignName, setCampaignName] = useState("");
   const [adBalance, setAdBalance] = useState<{ connected: boolean; balance: number | null; amountSpent: number | null; currency?: string; loading: boolean }>({ connected: false, balance: null, amountSpent: null, loading: false });
 
@@ -208,6 +210,8 @@ export default function NewCampaignPage() {
       };
 
       if (platform === "meta") {
+        body.targetRoas = targetRoas;
+        body.optimizationEnabled = optimizationEnabled;
         let adData = { primaryText: "", headline: "", description: "" };
         try {
           adData = JSON.parse(copyData?.content || "{}");
@@ -891,6 +895,65 @@ export default function NewCampaignPage() {
                   </p>
                 )}
               </div>
+
+              {/* Target ROAS / Autopilot */}
+              {platform === "meta" && (
+                <div className="rounded-xl border-2 border-violet-200 bg-gradient-to-br from-violet-50 to-indigo-50 p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span>🎯</span>
+                        <p className="text-sm font-semibold text-violet-900">
+                          {isKo ? "ROAS 자동 최적화" : "ROAS Autopilot"}
+                        </p>
+                      </div>
+                      <p className="mt-0.5 text-xs text-violet-700">
+                        {isKo
+                          ? "Piped가 1시간마다 지표를 읽고 목표 ROAS에 도달할 때까지 광고를 최적화합니다."
+                          : "Piped reads metrics hourly and optimizes ads until your target ROAS is hit."}
+                      </p>
+                    </div>
+                    <label className="relative inline-flex shrink-0 cursor-pointer items-center">
+                      <input
+                        type="checkbox"
+                        checked={optimizationEnabled}
+                        onChange={(e) => setOptimizationEnabled(e.target.checked)}
+                        className="peer sr-only"
+                      />
+                      <div className="h-6 w-11 rounded-full bg-gray-300 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:bg-violet-600 peer-checked:after:translate-x-5" />
+                    </label>
+                  </div>
+                  {optimizationEnabled && (
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-medium text-violet-900">
+                          {isKo ? "목표 ROAS" : "Target ROAS"}
+                        </label>
+                        <span className="text-lg font-bold text-violet-700">{targetRoas.toFixed(1)}x</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={1}
+                        max={10}
+                        step={0.5}
+                        value={targetRoas}
+                        onChange={(e) => setTargetRoas(+e.target.value)}
+                        className="w-full accent-violet-600"
+                      />
+                      <div className="flex justify-between text-[10px] text-violet-600">
+                        <span>1x</span>
+                        <span>5x</span>
+                        <span>10x</span>
+                      </div>
+                      <p className="mt-2 text-[11px] text-violet-700">
+                        {isKo
+                          ? `현재 ROAS가 ${targetRoas}x 미만이면 부진한 광고를 자동 일시정지하고, 위너에 예산을 재분배합니다.`
+                          : `If ROAS drops below ${targetRoas}x, Piped pauses underperformers and reallocates budget to winners.`}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Summary */}
               <div className="rounded-lg bg-gray-50 p-3 space-y-1 text-xs text-gray-600">

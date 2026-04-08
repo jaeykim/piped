@@ -25,6 +25,8 @@ export async function POST(request: NextRequest) {
       headline,
       linkDescription,
       destinationUrl,
+      targetRoas,
+      optimizationEnabled,
     } = body;
 
     // Get user's Meta integration
@@ -71,11 +73,15 @@ export async function POST(request: NextRequest) {
       ownerId: uid,
       platform: "meta",
       platformCampaignId: result.campaignId,
+      platformAdSetId: result.adSetId,
+      platformAdId: result.adId,
       name,
       status: "paused",
       objective,
       budget: { amount: dailyBudget, currency: "USD", type: "daily" },
       targeting,
+      targetRoas: typeof targetRoas === "number" ? targetRoas : null,
+      optimizationEnabled: !!optimizationEnabled,
       selectedCopyIds: [],
       selectedCreativeIds: [],
       createdAt: FieldValue.serverTimestamp(),
