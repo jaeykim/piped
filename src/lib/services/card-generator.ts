@@ -227,12 +227,13 @@ function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: nu
         const hwW = stringWidth(hw, headSize);
         const hlX = pad + beforeW;
         const hlColor = isDark ? "#FFE500" : `rgb(${r},${g},${b})`;
-        // Marker-pen highlight: hugs the letters tightly horizontally,
-        // tall enough to cover the cap height + a touch of breathing room.
-        const padX = 4;
-        const padTop = Math.round(headSize * 0.78);
-        const boxH = Math.round(headSize * 0.95);
-        hlSvg += `<rect x="${hlX - padX}" y="${ly - padTop}" width="${hwW + padX * 2}" height="${boxH}" rx="${Math.round(headSize * 0.08)}" fill="${hlColor}" opacity="${isDark ? 0.95 : 0.3}"/>`;
+        // Highlight is intentionally LARGER than the glyphs — bold marker
+        // block that frames the word from above the ascender to below the
+        // baseline, with visible horizontal margin past the word edges.
+        const padX = Math.round(headSize * 0.15);
+        const padTop = Math.round(headSize * 1.0);
+        const boxH = Math.round(headSize * 1.3);
+        hlSvg += `<rect x="${hlX - padX}" y="${ly - padTop}" width="${hwW + padX * 2}" height="${boxH}" rx="${Math.round(headSize * 0.1)}" fill="${hlColor}" opacity="${isDark ? 0.95 : 0.32}"/>`;
       }
     }
     // Text with stroke outline for readability on any background
