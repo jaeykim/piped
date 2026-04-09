@@ -39,7 +39,7 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const [projects, campaigns, optimizationLogs, creditHistory] =
+  const [projects, campaigns, optimizationLogs, creditHistory, creatives] =
     await Promise.all([
       prisma.project.findMany({
         where: { ownerId: userId },
@@ -84,6 +84,22 @@ export async function GET(
         orderBy: { createdAt: "desc" },
         take: 30,
       }),
+      // Recent creatives across all of the user's projects
+      prisma.creative.findMany({
+        where: { project: { ownerId: userId } },
+        orderBy: { createdAt: "desc" },
+        take: 24,
+        select: {
+          id: true,
+          imageUrl: true,
+          concept: true,
+          subject: true,
+          size: true,
+          status: true,
+          createdAt: true,
+          projectId: true,
+        },
+      }),
     ]);
 
   return NextResponse.json({
@@ -120,6 +136,7 @@ export async function GET(
       createdAt: l.createdAt,
     })),
     creditHistory,
+    creatives,
   });
 }
 

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ShieldCheck, ChevronRight } from "lucide-react";
 import { getAuth_ } from "@/lib/firebase/client";
 import { useLocale } from "@/context/locale-context";
 import { Card, CardContent } from "@/components/ui/card";
@@ -70,6 +70,16 @@ interface AdminUserDetail {
     action: string;
     description: string;
     createdAt: string;
+  }>;
+  creatives: Array<{
+    id: string;
+    imageUrl: string;
+    concept: string;
+    subject: string | null;
+    size: string;
+    status: string;
+    createdAt: string;
+    projectId: string;
   }>;
 }
 
@@ -369,30 +379,74 @@ export default function AdminUserDetailPage() {
           ) : (
             <ul className="divide-y divide-gray-100 text-sm">
               {data.campaigns.map((c) => (
-                <li
-                  key={c.id}
-                  className="flex items-center justify-between gap-3 py-2"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate font-medium text-gray-900">
-                      {c.name}
-                    </p>
-                    <p className="text-[11px] text-gray-400">
-                      {c.platform} · {c.objective} · ${c.budgetAmount}/
-                      {isKo ? "일" : "day"}
-                      {c.targetRoas != null && c.optimizationEnabled && (
-                        <> · 🎯 {c.targetRoas}x ROAS</>
-                      )}
-                    </p>
-                  </div>
-                  <Badge
-                    variant={c.status === "active" ? "success" : "warning"}
+                <li key={c.id}>
+                  <Link
+                    href={`/admin/campaigns/${c.id}`}
+                    className="flex items-center justify-between gap-3 py-2 hover:bg-gray-50"
                   >
-                    {c.status}
-                  </Badge>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-gray-900">
+                        {c.name}
+                      </p>
+                      <p className="text-[11px] text-gray-400">
+                        {c.platform} · {c.objective} · ${c.budgetAmount}/
+                        {isKo ? "일" : "day"}
+                        {c.targetRoas != null && c.optimizationEnabled && (
+                          <> · 🎯 {c.targetRoas}x ROAS</>
+                        )}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant={c.status === "active" ? "success" : "warning"}
+                      >
+                        {c.status}
+                      </Badge>
+                      <ChevronRight className="h-4 w-4 text-gray-300" />
+                    </div>
+                  </Link>
                 </li>
               ))}
             </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Creatives gallery */}
+      <h2 className="mt-6 text-sm font-semibold text-gray-700">
+        {isKo ? "광고 소재" : "Creatives"}{" "}
+        <span className="ml-1 text-gray-400">({data.creatives.length})</span>
+      </h2>
+      <Card className="mt-2">
+        <CardContent className="py-3">
+          {data.creatives.length === 0 ? (
+            <p className="py-4 text-center text-sm text-gray-400">
+              {isKo ? "광고 소재 없음" : "No creatives"}
+            </p>
+          ) : (
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+              {data.creatives.map((cr) => (
+                <Link
+                  key={cr.id}
+                  href={`/admin/creatives/${cr.id}`}
+                  className="group block aspect-square overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
+                  title={`${cr.concept} · ${cr.size}`}
+                >
+                  {cr.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={cr.imageUrl}
+                      alt={cr.concept}
+                      className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-[10px] text-gray-300">
+                      no img
+                    </div>
+                  )}
+                </Link>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>
