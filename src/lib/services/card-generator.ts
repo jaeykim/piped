@@ -227,7 +227,12 @@ function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: nu
         const hwW = stringWidth(hw, headSize);
         const hlX = pad + beforeW;
         const hlColor = isDark ? "#FFE500" : `rgb(${r},${g},${b})`;
-        hlSvg += `<rect x="${hlX - 4}" y="${ly - headSize * 0.85}" width="${hwW + 8}" height="${headSize * 1.1}" rx="6" fill="${hlColor}" opacity="${isDark ? 0.92 : 0.25}"/>`;
+        // Bigger than the glyph itself — fully envelopes the bold letters,
+        // including descenders + extra horizontal breathing room.
+        const padX = Math.round(headSize * 0.18);
+        const padTop = Math.round(headSize * 1.05);
+        const boxH = Math.round(headSize * 1.4);
+        hlSvg += `<rect x="${hlX - padX}" y="${ly - padTop}" width="${hwW + padX * 2}" height="${boxH}" rx="${Math.round(headSize * 0.12)}" fill="${hlColor}" opacity="${isDark ? 0.95 : 0.3}"/>`;
       }
     }
     // Text with stroke outline for readability on any background
