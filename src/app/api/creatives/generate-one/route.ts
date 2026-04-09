@@ -4,7 +4,7 @@ import { adminAuth } from "@/lib/firebase/admin";
 import { prisma } from "@/lib/prisma";
 import { saveImage } from "@/lib/storage";
 import { generateImage } from "@/lib/services/image-generator";
-import { generateGraphicCard, generateCardWithImage, generateCardOnImage, generateCardOnImageNoText, generateGraphicCardNoText } from "@/lib/services/card-generator";
+import { generateGraphicCard, generateCardOnImage } from "@/lib/services/card-generator";
 import { selectCopyTrio } from "@/lib/services/copy-generator";
 import { requireCredits, deductCredits } from "@/lib/services/credits";
 import type { SiteAnalysis } from "@/types/analysis";
@@ -303,15 +303,17 @@ export async function POST(request: NextRequest) {
         }
 
         if (imageBuffer) {
-          // FULL-BLEED: image fills entire card, gradient overlay, NO text (frontend renders text)
-          const composited = await generateCardOnImageNoText(cardConfig, imageBuffer);
+          // Layered composition: clean background image + gradient overlay
+          // + crisp SVG-rendered headline / sub / CTA / brand. Text is
+          // baked in server-side so the same pixels go to Meta.
+          const composited = await generateCardOnImage(cardConfig, imageBuffer);
           cardData = composited.data;
         } else {
-          cardData = (await generateGraphicCardNoText(cardConfig)).data;
+          cardData = (await generateGraphicCard(cardConfig)).data;
         }
       } catch (e) {
         console.error("Screenshot mockup failed:", e);
-        cardData = (await generateGraphicCardNoText(cardConfig)).data;
+        cardData = (await generateGraphicCard(cardConfig)).data;
       }
 
       result = {

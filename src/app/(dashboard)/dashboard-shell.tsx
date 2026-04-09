@@ -29,8 +29,12 @@ export function DashboardShell({
   if (loading) return <FullPageSpinner />;
   if (!user || !profile) return null;
 
+  // Note: we deliberately avoid `h-screen overflow-hidden` here. On mobile
+  // (esp. iOS Safari) the URL bar dynamically shrinks the visible viewport,
+  // and a fixed-height inner-scrolling layout chops off the bottom of the
+  // content. Letting the body scroll naturally fixes that.
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex min-h-screen">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
@@ -39,19 +43,19 @@ export function DashboardShell({
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar — sticky on desktop, slide-in on mobile */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 transform transition-transform lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 transform transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <Sidebar onNavigate={() => setSidebarOpen(false)} />
       </div>
 
-      {/* Main content */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      {/* Main content — scrolls with the page */}
+      <div className="flex min-w-0 flex-1 flex-col">
         <Topbar onMenuClick={() => setSidebarOpen(true)} />
-        <main className="flex-1 overflow-y-auto bg-gray-50 p-4 sm:p-6">
+        <main className="flex-1 bg-gray-50 p-4 pb-24 sm:p-6">
           {children}
         </main>
       </div>

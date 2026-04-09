@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Users,
@@ -9,6 +10,7 @@ import {
   Activity,
   Search,
   ShieldCheck,
+  ImageIcon,
 } from "lucide-react";
 import { getAuth_ } from "@/lib/firebase/client";
 import { useAuth } from "@/context/auth-context";
@@ -51,6 +53,7 @@ export default function AdminPage() {
   const { profile, loading: authLoading } = useAuth();
   const { locale } = useLocale();
   const { toast } = useToast();
+  const router = useRouter();
   const isKo = locale.startsWith("ko");
 
   const [forbidden, setForbidden] = useState(false);
@@ -179,17 +182,28 @@ export default function AdminPage() {
 
   return (
     <div>
-      <div className="flex items-center gap-2">
-        <ShieldCheck className="h-6 w-6 text-indigo-600" />
-        <h1 className="text-2xl font-bold text-gray-900">
-          {isKo ? "어드민" : "Admin"}
-        </h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-6 w-6 text-indigo-600" />
+            <h1 className="text-2xl font-bold text-gray-900">
+              {isKo ? "어드민" : "Admin"}
+            </h1>
+          </div>
+          <p className="mt-1 text-sm text-gray-500">
+            {isKo
+              ? "사용자 관리 및 플랫폼 활동 추적"
+              : "Manage users and track platform activity"}
+          </p>
+        </div>
+        <Link
+          href="/admin/creatives"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-indigo-300 hover:bg-indigo-50"
+        >
+          <ImageIcon className="h-4 w-4" />
+          {isKo ? "광고 소재 갤러리" : "Creatives gallery"}
+        </Link>
       </div>
-      <p className="mt-1 text-sm text-gray-500">
-        {isKo
-          ? "사용자 관리 및 플랫폼 활동 추적"
-          : "Manage users and track platform activity"}
-      </p>
 
       {/* Stats tiles */}
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -261,12 +275,13 @@ export default function AdminPage() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-gray-50">
+                  <tr
+                    key={u.id}
+                    onClick={() => router.push(`/admin/users/${u.id}`)}
+                    className="cursor-pointer hover:bg-indigo-50/40"
+                  >
                     <td className="px-4 py-2.5">
-                      <Link
-                        href={`/admin/users/${u.id}`}
-                        className="block min-w-0"
-                      >
+                      <div className="block min-w-0">
                         <p className="flex items-center gap-1.5 truncate font-medium text-gray-900">
                           {u.displayName || u.email}
                           {u.isAdmin && (
@@ -276,7 +291,7 @@ export default function AdminPage() {
                         <p className="truncate text-[11px] text-gray-400">
                           {u.email}
                         </p>
-                      </Link>
+                      </div>
                     </td>
                     <td className="px-4 py-2.5">
                       <div className="flex gap-1">
