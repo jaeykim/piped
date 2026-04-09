@@ -46,21 +46,37 @@ function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-// Conservative Korean wrap — uses wider char estimate to prevent overflow
+// Per-character width estimator for Noto Sans (KR) at the chosen weight.
+// Gets us within ~5% of actual glyph widths, which is enough for the
+// highlight rect to land where the user expects.
+function charWidth(ch: string, fontSize: number): number {
+  if (/[\u3000-\u9fff\uac00-\ud7af]/.test(ch)) return fontSize * 0.95; // CJK
+  if (/[A-Z]/.test(ch)) return fontSize * 0.66;
+  if (/[0-9]/.test(ch)) return fontSize * 0.6;
+  if (/[a-z]/.test(ch)) return fontSize * 0.52;
+  if (/\s/.test(ch)) return fontSize * 0.3;
+  if (/[%$+\-=]/.test(ch)) return fontSize * 0.55;
+  return fontSize * 0.5; // punctuation, etc.
+}
+
+function stringWidth(s: string, fontSize: number): number {
+  let w = 0;
+  for (const ch of s) w += charWidth(ch, fontSize);
+  return w;
+}
+
+// Word-aware wrap. Uses real per-char widths so the resulting lines
+// roughly match what the renderer actually draws.
 function wrapText(text: string, fontSize: number, maxW: number): string[] {
   const lines: string[] = [];
   for (const para of text.split("\n")) {
     if (!para.trim()) { lines.push(""); continue; }
-    // Use 0.95 for Korean (wider chars), 0.6 for Latin
-    const isCJK = /[\u3000-\u9fff\uac00-\ud7af]/.test(para);
-    const charW = fontSize * (isCJK ? 0.95 : 0.6);
-    const maxChars = Math.floor(maxW / charW);
 
     const words = para.split(" ");
     let cur = "";
     for (const word of words) {
       const test = cur ? cur + " " + word : word;
-      if (test.length > maxChars && cur) {
+      if (stringWidth(test, fontSize) > maxW && cur) {
         lines.push(cur);
         cur = word;
       } else {
@@ -68,12 +84,15 @@ function wrapText(text: string, fontSize: number, maxW: number): string[] {
       }
     }
     // If single word exceeds max, break by chars
-    if (cur && cur.length > maxChars) {
+    if (cur && stringWidth(cur, fontSize) > maxW) {
       let charCur = "";
       for (const ch of cur) {
-        if ((charCur.length + 1) * (fontSize * 0.95) > maxW && charCur) {
-          lines.push(charCur); charCur = ch;
-        } else { charCur += ch; }
+        if (stringWidth(charCur + ch, fontSize) > maxW && charCur) {
+          lines.push(charCur);
+          charCur = ch;
+        } else {
+          charCur += ch;
+        }
       }
       if (charCur) lines.push(charCur);
     } else if (cur) {
@@ -96,38 +115,39 @@ function fitHeadline(text: string, baseSize: number, maxW: number, maxLines: num
 }
 
 function buildBgSvg(w: number, h: number, r: number, g: number, b: number, style: string, _isPortrait: boolean): string {
-  // Fill the entire frame — no empty space
+  // Fill the entire frame. Decorative circles live BELOW the headline area
+  // (top ~40% of the card) so they don't muddy the most important text.
   const l = (amt: number) => lighten(r, g, b, amt);
   let bg = "";
 
   if (style === "dark") {
     bg = `<rect width="${w}" height="${h}" fill="#1a1a2e"/>
       <rect width="${w}" height="${h}" fill="url(#bgGrad)" opacity="0.5"/>
-      <circle cx="${w * 0.85}" cy="${h * 0.2}" r="${w * 0.35}" fill="rgb(${r},${g},${b})" opacity="0.15"/>
-      <circle cx="${w * 0.15}" cy="${h * 0.8}" r="${w * 0.3}" fill="rgb(${r},${g},${b})" opacity="0.1"/>
+      <circle cx="${w * 0.92}" cy="${h * 0.62}" r="${w * 0.32}" fill="rgb(${r},${g},${b})" opacity="0.15"/>
+      <circle cx="${w * 0.08}" cy="${h * 0.92}" r="${w * 0.28}" fill="rgb(${r},${g},${b})" opacity="0.1"/>
       <rect x="0" y="${h * 0.6}" width="${w}" height="${h * 0.4}" fill="rgb(${r},${g},${b})" opacity="0.08"/>`;
   } else if (style === "gradient") {
     bg = `<rect width="${w}" height="${h}" fill="${l(0.85)}"/>
       <rect width="${w}" height="${h}" fill="url(#bgGrad)" opacity="0.15"/>
-      <circle cx="${w * 0.8}" cy="${h * 0.3}" r="${w * 0.4}" fill="rgb(${r},${g},${b})" opacity="0.08"/>
-      <circle cx="${w * 0.2}" cy="${h * 0.7}" r="${w * 0.35}" fill="rgb(${r},${g},${b})" opacity="0.06"/>
-      <rect x="0" y="${h * 0.65}" width="${w}" height="${h * 0.35}" fill="rgb(${r},${g},${b})" opacity="0.05" rx="${w * 0.02}"/>`;
+      <circle cx="${w * 0.92}" cy="${h * 0.7}" r="${w * 0.36}" fill="rgb(${r},${g},${b})" opacity="0.1"/>
+      <circle cx="${w * 0.08}" cy="${h * 0.95}" r="${w * 0.28}" fill="rgb(${r},${g},${b})" opacity="0.07"/>
+      <rect x="0" y="${h * 0.65}" width="${w}" height="${h * 0.35}" fill="rgb(${r},${g},${b})" opacity="0.06" rx="${w * 0.02}"/>`;
   } else if (style === "bold") {
     bg = `<rect width="${w}" height="${h}" fill="rgb(${r},${g},${b})"/>
       <rect width="${w}" height="${h}" fill="url(#bgGrad)" opacity="0.3"/>
-      <circle cx="${w * 0.8}" cy="${h * 0.25}" r="${w * 0.35}" fill="rgba(255,255,255,0.06)"/>
-      <circle cx="${w * 0.2}" cy="${h * 0.75}" r="${w * 0.3}" fill="rgba(0,0,0,0.08)"/>
-      <rect x="0" y="${h * 0.7}" width="${w}" height="${h * 0.3}" fill="rgba(0,0,0,0.1)"/>`;
+      <circle cx="${w * 0.92}" cy="${h * 0.65}" r="${w * 0.32}" fill="rgba(255,255,255,0.07)"/>
+      <circle cx="${w * 0.08}" cy="${h * 0.95}" r="${w * 0.26}" fill="rgba(0,0,0,0.1)"/>
+      <rect x="0" y="${h * 0.7}" width="${w}" height="${h * 0.3}" fill="rgba(0,0,0,0.12)"/>`;
   } else if (style === "review") {
     bg = `<rect width="${w}" height="${h}" fill="#FFF9F0"/>
-      <circle cx="${w * 0.85}" cy="${h * 0.25}" r="${w * 0.3}" fill="rgb(${r},${g},${b})" opacity="0.05"/>
-      <circle cx="${w * 0.15}" cy="${h * 0.75}" r="${w * 0.25}" fill="rgb(${r},${g},${b})" opacity="0.04"/>
-      <rect x="0" y="${h * 0.65}" width="${w}" height="${h * 0.35}" fill="rgb(${r},${g},${b})" opacity="0.04"/>`;
+      <circle cx="${w * 0.92}" cy="${h * 0.7}" r="${w * 0.28}" fill="rgb(${r},${g},${b})" opacity="0.06"/>
+      <circle cx="${w * 0.08}" cy="${h * 0.95}" r="${w * 0.22}" fill="rgb(${r},${g},${b})" opacity="0.05"/>
+      <rect x="0" y="${h * 0.65}" width="${w}" height="${h * 0.35}" fill="rgb(${r},${g},${b})" opacity="0.05"/>`;
   } else {
     bg = `<rect width="${w}" height="${h}" fill="#F5F5F5"/>
       <rect width="${w}" height="${h}" fill="url(#bgGrad)" opacity="0.08"/>
-      <circle cx="${w * 0.8}" cy="${h * 0.3}" r="${w * 0.35}" fill="rgb(${r},${g},${b})" opacity="0.06"/>
-      <rect x="0" y="${h * 0.65}" width="${w}" height="${h * 0.35}" fill="rgb(${r},${g},${b})" opacity="0.04"/>`;
+      <circle cx="${w * 0.92}" cy="${h * 0.7}" r="${w * 0.32}" fill="rgb(${r},${g},${b})" opacity="0.07"/>
+      <rect x="0" y="${h * 0.65}" width="${w}" height="${h * 0.35}" fill="rgb(${r},${g},${b})" opacity="0.05"/>`;
   }
 
   return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
@@ -171,8 +191,8 @@ function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: nu
   const totalContentH = badgeH + headBlockH + subBlockH;
   const availableH = h - bannerH - ctaBannerH - pad * 2;
 
-  // Vertically center the text block
-  let y = bannerH + Math.max(pad, Math.round((availableH - totalContentH) / 2.5));
+  // True vertical centering — split the slack evenly above and below.
+  let y = bannerH + pad + Math.max(0, Math.round((availableH - totalContentH) / 2));
 
   // ── Top banner (full width, pinned to top) ──
   let topSvg = "";
@@ -195,6 +215,7 @@ function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: nu
   }
 
   // ── Headline (vertically centered) ──
+  // Per-character widths land the highlight box on the actual word.
   const highlights = config.highlightWords || [];
   const headSvg = headLines.map((line, i) => {
     const ly = y + headSize + i * lineH;
@@ -202,12 +223,11 @@ function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: nu
     for (const hw of highlights) {
       const idx = line.indexOf(hw);
       if (idx >= 0) {
-        const isCJK = /[\u3000-\u9fff\uac00-\ud7af]/.test(hw);
-        const charW = headSize * (isCJK ? 0.95 : 0.6);
-        const hlX = pad + idx * charW;
-        const hlW = hw.length * charW;
+        const beforeW = stringWidth(line.substring(0, idx), headSize);
+        const hwW = stringWidth(hw, headSize);
+        const hlX = pad + beforeW;
         const hlColor = isDark ? "#FFE500" : `rgb(${r},${g},${b})`;
-        hlSvg += `<rect x="${hlX - 4}" y="${ly - headSize * 0.85}" width="${hlW + 8}" height="${headSize * 1.1}" rx="4" fill="${hlColor}" opacity="${isDark ? 0.9 : 0.2}"/>`;
+        hlSvg += `<rect x="${hlX - 4}" y="${ly - headSize * 0.85}" width="${hwW + 8}" height="${headSize * 1.1}" rx="6" fill="${hlColor}" opacity="${isDark ? 0.92 : 0.25}"/>`;
       }
     }
     // Text with stroke outline for readability on any background
@@ -234,10 +254,10 @@ function buildTextSvg(w: number, h: number, config: CardConfig, r: number, g: nu
       <text x="${w / 2}" y="${ctaY + ctaBannerH / 2 + ctaFs * 0.35}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="800" font-size="${ctaFs}" fill="${ctaFill}" text-anchor="middle">${esc(config.cta)}</text>`;
   }
 
-  // ── Brand (just above CTA) ──
-  const brandFs = badgeSize;
-  const brandY = config.cta ? h - ctaBannerH - brandFs * 2 : h - pad - brandFs;
-  const brandSvg = `<text x="${w - pad}" y="${brandY}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="600" font-size="${brandFs}" fill="${isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.2)"}" text-anchor="end">${esc(config.productName)}</text>`;
+  // ── Brand mark (just above CTA, more legible than before) ──
+  const brandFs = Math.round(badgeSize * 1.2);
+  const brandY = config.cta ? h - ctaBannerH - brandFs * 1.4 : h - pad - brandFs;
+  const brandSvg = `<text x="${w - pad}" y="${brandY}" font-family="Noto Sans KR, Noto Sans CJK KR, sans-serif" font-weight="700" font-size="${brandFs}" fill="${isDark ? "rgba(255,255,255,0.75)" : "rgba(0,0,0,0.55)"}" text-anchor="end">${esc(config.productName)}</text>`;
 
   return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
     ${topSvg}${badgeSvg}${headSvg}${subSvg}${ctaSvg}${brandSvg}
