@@ -25,6 +25,7 @@ model User {
   displayName        String
   photoURL           String?
   role               UserRole  @default(owner)
+  isAdmin            Boolean   @default(false)
   credits            Int       @default(0)
   onboardingComplete Boolean   @default(false)
 

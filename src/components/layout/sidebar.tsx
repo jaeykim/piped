@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -9,16 +10,43 @@ import {
   LogOut,
   Zap,
   AlertCircle,
+  ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useLocale } from "@/context/locale-context";
 import { signOut } from "@/lib/firebase/auth";
+import { getAuth_ } from "@/lib/firebase/client";
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { profile } = useAuth();
   const { t } = useLocale();
   const metaConnected = !!profile?.integrations?.meta?.accessToken;
+
+  // Probe /api/admin/me to know whether to show the admin link. Cheap call,
+  // returns { isAdmin: bool } either way so no error juggling needed.
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    if (!profile) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await getAuth_().currentUser?.getIdToken();
+        if (!token) return;
+        const res = await fetch("/api/admin/me", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok || cancelled) return;
+        const j = await res.json();
+        if (!cancelled) setIsAdmin(!!j.isAdmin);
+      } catch {
+        /* silent */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [profile]);
 
   // Creatives intentionally not in the top-level nav — they're created
   // as part of the campaign flow, not a separate concept. Reachable via
@@ -29,6 +57,9 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     { label: t.sidebar.dashboard, href: "/dashboard", icon: LayoutDashboard },
     { label: t.sidebar.campaigns, href: "/campaigns", icon: Megaphone },
     { label: t.sidebar.settings, href: "/settings", icon: Settings },
+    ...(isAdmin
+      ? [{ label: "Admin", href: "/admin", icon: ShieldCheck }]
+      : []),
   ];
 
   return (
